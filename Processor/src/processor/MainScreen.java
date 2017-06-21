@@ -1,5 +1,6 @@
 package processor;
 
+import java.util.ArrayList;
 import java.util.List;
 import javax.swing.table.DefaultTableModel;
 
@@ -14,25 +15,53 @@ public class MainScreen extends javax.swing.JFrame {
     private void updateTable(){
         List<RegisterStatus> registerStatus = processor.getRegisterStatus();
         List<ReorderBuffer> reorderBuffer = processor.getRo();
-        List<ReservationStation> reservation = processor.getReservationStations();
+        List<ReservationStation> reservationStation = new ArrayList<>();
+        reservationStation.addAll(processor.getReservationStationsMemoria());
+        reservationStation.addAll(processor.getReservationStationsSoma());
+        reservationStation.addAll(processor.getReservationStationsMultiplicacao());
         
         DefaultTableModel regTable = (DefaultTableModel)registerTable.getModel();
         DefaultTableModel roTable = (DefaultTableModel)ReorderBufferTable.getModel();
         DefaultTableModel reserveTable = (DefaultTableModel)ReservationTable.getModel();
         int count = 0;
         
-        for(RegisterStatus rs:registerStatus){
+        for(RegisterStatus rs: registerStatus){
             String qi = "";
-            String status = String.valueOf(rs.status);
+            String status = rs.status?"0":"1";
             if (rs.status){
                 qi = "ER"+String.valueOf(rs.qi+1);
             }
-            regTable.setValueAt(qi, count%8+1, 1+3*(count/8));
-            regTable.setValueAt(status, count%8+1, 2+3*(count/8));
+            regTable.setValueAt(qi, count%8, 1+3*(count/8));
+            regTable.setValueAt(status, count%8, 2+3*(count/8));
             count++;
         }
         
-        for (ReorderBuffer ro:reorderBuffer){
+        count = 1;
+        reserveTable.setRowCount(0);
+        for (ReservationStation rs: reservationStation){
+            String id = "ER"+count++;
+            String type = rs.name;
+            String busy = rs.busy?"Sim":"Nao";
+            String instruction = rs.op.toString();
+            String destination = String.valueOf(rs.dest);
+            String vj = String.valueOf(rs.vj);
+            String vk = String.valueOf(rs.vk);
+            String qj = String.valueOf(rs.qj);
+            String qk = String.valueOf(rs.qk);
+            String A = String.valueOf(rs.A);
+            
+            reserveTable.addRow(new String[]{
+                id,
+                type,
+                busy,
+                instruction,
+                destination,
+                vj,
+                vk,
+                qj,
+                qk,
+                A
+            });
             
         }
     }
@@ -57,27 +86,27 @@ public class MainScreen extends javax.swing.JFrame {
 
         ReservationTable.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
-                {"ER1", "Load/Store", null, null, null, null, null, null, null},
-                {"ER2", "Load/Store", null, null, null, null, null, null, null},
-                {"ER3", "Load/Store", null, null, null, null, null, null, null},
-                {"ER4", "Load/Store", null, null, null, null, null, null, null},
-                {"ER5", "Load/Store", null, null, null, null, null, null, null},
-                {"ER6", "Add", null, null, null, null, null, null, null},
-                {"ER7", "Add", null, null, null, null, null, null, null},
-                {"ER8", "Add", null, null, null, null, null, null, null},
-                {"ER9", "Mult", null, null, null, null, null, null, null},
-                {"ER10", "Mult", null, null, null, null, null, null, null},
-                {"ER11", "Mult", null, null, null, null, null, null, null}
+                {"ER1", "Load/Store", null, null, null, null, null, null, null, null},
+                {"ER2", "Load/Store", null, null, null, null, null, null, null, null},
+                {"ER3", "Load/Store", null, null, null, null, null, null, null, null},
+                {"ER4", "Load/Store", null, null, null, null, null, null, null, null},
+                {"ER5", "Load/Store", null, null, null, null, null, null, null, null},
+                {"ER6", "Add", null, null, null, null, null, null, null, null},
+                {"ER7", "Add", null, null, null, null, null, null, null, null},
+                {"ER8", "Add", null, null, null, null, null, null, null, null},
+                {"ER9", "Mult", null, null, null, null, null, null, null, null},
+                {"ER10", "Mult", null, null, null, null, null, null, null, null},
+                {"ER11", "Mult", null, null, null, null, null, null, null, null}
             },
             new String [] {
-                "ID", "Tipo", "Instrução", "Dest.", "Vj", "Vk", "Qj", "Qk", "A"
+                "ID", "Tipo", "Busy", "Instrução", "Dest.", "Vj", "Vk", "Qj", "Qk", "A"
             }
         ) {
             Class[] types = new Class [] {
-                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
+                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
             };
             boolean[] canEdit = new boolean [] {
-                false, false, false, false, false, false, false, false, false
+                false, false, false, false, false, false, false, false, false, false
             };
 
             public Class getColumnClass(int columnIndex) {
@@ -223,7 +252,6 @@ public class MainScreen extends javax.swing.JFrame {
         if (processor==null)return;
         startButton.setEnabled(false);
         nextButton.setEnabled(true);
-        updateTable();
     }//GEN-LAST:event_startButtonActionPerformed
 
     private void nextButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nextButtonActionPerformed

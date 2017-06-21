@@ -1,6 +1,7 @@
 package processor;
 
 import java.util.AbstractMap;
+import java.util.HashMap;
 
 enum CommandType{
     R,I,J
@@ -18,8 +19,10 @@ public class Command {
     public int immediate;
     public int targetAddress;
     public CommandType commandType;
-    
+    public int T_Dest;     //T_Dest é o registrador de destino no Tomasulo.
+
     public static void setMap(){
+        operationMap = new HashMap<>();
         operationMap.put("100000", Operation.ADD);
         operationMap.put("001000", Operation.ADDI);
         operationMap.put("000101", Operation.BEQ);
@@ -73,7 +76,7 @@ public class Command {
         String opcode = command.substring(0,6);
         Command com = new Command();
         if (opcode.equalsIgnoreCase("000000")){
-            setICom(command,com);
+            setRCom(command,com);
         }else if (opcode.equalsIgnoreCase("000010")){
             setJCom(command,com);
         }
@@ -81,5 +84,32 @@ public class Command {
             setICom(command,com);
         }
         return com;
+    }
+     public boolean isR ()
+    {
+        return (commandType == CommandType.R);
+    }
+    
+    public boolean isI ()
+    {
+        return (commandType == CommandType.I);
+    }
+    
+    public boolean isJ ()
+    {
+        return (commandType == CommandType.J);
+    }
+    //se pertence a estacao soma
+    public boolean isEstacaoSoma(){
+        return((op == Operation.ADD) || (op == Operation.ADDI) || (op == Operation.BEQ)|| 
+                (op == Operation.BLE) || (op == Operation.BNE) || (op == Operation.SUB) );
+    }
+    //se pertence a estacao mult
+    public boolean isEstacaoMult(){
+        return(op == Operation.MUL);
+    }
+    //se pertence a estacao memoria
+    public boolean isEstacaoMem(){
+        return(op == Operation.LW || op == Operation.SW);
     }
 }
