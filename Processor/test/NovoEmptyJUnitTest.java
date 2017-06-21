@@ -19,7 +19,7 @@ public class NovoEmptyJUnitTest {
     public void NovoEmptyJUnitTest() {
         Processor p = new Processor();
         for (int i = 0; i < 12; i++){
-            p.issue();
+            p.process();
         }
         /*while(true){
             

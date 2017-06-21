@@ -12,9 +12,23 @@ import java.util.List;
 class Register{
     public int value = 0;
     public boolean status;
-    public int qi = -1;
+    public int qi = -1; //ESTA SE USANDO -1 NO LUGAR D 0!!!!!!!!!!!!!!!!!!!!!
     public boolean busy = false;
-    public int reorder = 0;    
+    public int reorder = -1;
+    public Register(Register r){
+        this.value = r.value;
+        this.status = r.status;
+        this.qi = r.qi;
+        this.busy = r.busy;
+        this.reorder = r.reorder;
+    }
+    public Register(){
+        this.value = 0;
+        this.qi = -1;
+        this.busy = false;
+        this.reorder = -1;
+    }
+    
     
 }
 
@@ -28,23 +42,68 @@ class ReservationStation{
     public int qj;
     public int qk;
     public int A;
+    public ReservationStation(ReservationStation r){
+        this.name = r.name;
+        this.busy = r.busy;
+        this.op = r.op;
+        this.dest = r.dest;
+        this.vj = r.vj;
+        this.vk = r.vk;
+        this.qj = r.qj;
+        this.qk = r.qk;
+        this.A = r.A;
+    }
+    public ReservationStation(){
+        
+    }
 }
 class ULA{
     public boolean busy = false;
-    int contClocks = 0;
-    int timeToFinish;
+    public boolean done = false;
+    public int result = 0;
+    public int contClocks = 0;
+    public int timeToFinish;
+    public ReservationStation rStationOperando;
     public ULA(int i){
         this.timeToFinish = i;
     }
+    public int doFPOperation(){
+        if(rStationOperando.op == Operation.ADD || rStationOperando.op == Operation.ADDI)
+            return rStationOperando.vj + rStationOperando.vk;
+        if(rStationOperando.op == Operation.MUL)
+            return rStationOperando.vj * rStationOperando.vk;
+        if(rStationOperando.op == Operation.SUB)
+            return rStationOperando.vj - rStationOperando.vk;
+        if(rStationOperando.op == Operation.BNE)
+            return rStationOperando.vj - rStationOperando.vk;
+        if(rStationOperando.op == Operation.SUB)
+            return rStationOperando.vj - rStationOperando.vk;
+        if(rStationOperando.op == Operation.SUB)
+            return rStationOperando.vj - rStationOperando.vk;
+        return 0; //para as instrucoes que nao tem retorno
+    }
 }
 class ReorderBuffer{
-    public boolean busy = false;
+    public boolean busy;
     public String instruction;
     public State state;
-    public boolean ready = false;
+    public boolean ready;
     public int destination;
     public String destinationType; //se é Registrador, memoria...
     public int value;
+    public ReorderBuffer(ReorderBuffer r){
+        this.busy = r.busy;
+        this.instruction = r.instruction;
+        this.state = r.state;
+        this.ready = r.ready;
+        this.destination = r.destination;
+        this.destinationType = r.destinationType;
+        this.value = r.value;
+    }
+    public ReorderBuffer(){
+        this.busy = false;
+        this.ready = false;
+    }
 }
 
 public class Processor {
@@ -86,7 +145,7 @@ public class Processor {
             System.out.println("Erro na leitura");
         }
     }    
-    private void initEstacoesReservaERobERegister() throws CloneNotSupportedException{
+    private void initEstacoesReservaERobERegister(){
         for(int i = 0;i<3;i++){
             ReservationStation temp = new ReservationStation();
             temp.busy = false;
@@ -120,7 +179,6 @@ public class Processor {
         for(int i = 0;i<10;i++){
             ReorderBuffer temp = new ReorderBuffer();
             temp.busy = false;
-            temp.clone();
             rob.add(temp); 
             temp = new ReorderBuffer();
             temp.busy = false;
@@ -264,9 +322,30 @@ public class Processor {
         //ATUALIZAR PC
         pc = pc + 4;
     }    
-    
+    //TO DO
     public void execute(){
-        //
+        //add
+        if(ulaAdd.busy){
+            if(ulaAdd.contClocks == ulaAdd.timeToFinish){
+                ulaAdd.doFPOperation();
+                //FALTA OS BRANCHES
+            }
+        }
+        else{
+            
+        }
+        if(ulaMem.busy){
+            
+        }
+        else{
+            
+        }
+        if(ulaMult.busy){
+            
+        }
+        else{
+            
+        }
     }
     //processador principal
    
@@ -274,14 +353,35 @@ public class Processor {
         //fazer tudo dentro de um loop até acabar!!!!
         issue();
         execute(); //TO DO
-        write(); //TO DO
-        commit(); //TO DO
-        rob = new ArrayList<>(robTemp);
-        reservationStationsMemoria = new ArrayList<>(reservationStationsMemoriaTemp);
-        reservationStationsMultiplicacao = new ArrayList<>(reservationStationsMultiplicacaoTemp);
-        reservationStationsSoma = new ArrayList<>(reservationStationsSomaTemp);
+    //    write(); //TO DO
+    //    commit(); //TO DO
+        
+        //OBS: deve ser necessario copiar objeto a objeto, nao a lista  
+        ArrayList<ReorderBuffer> rob2 = new ArrayList<>();
+        for (ReorderBuffer r : robTemp){
+            rob2.add(new ReorderBuffer(r));
+        }
+        rob = new ArrayList<>(rob2);
+        ArrayList<ReservationStation> r2 = new ArrayList<>();
+        for (ReservationStation r: reservationStationsMemoriaTemp){
+            r2.add(new ReservationStation(r));
+        }
+        reservationStationsMemoria = new ArrayList<>(r2);
+        r2.clear();
+        for (ReservationStation r: reservationStationsMultiplicacaoTemp){
+            r2.add(new ReservationStation(r));
+        }
+        reservationStationsMultiplicacao = new ArrayList<>(r2);        
+        r2.clear();
+        for (ReservationStation r: reservationStationsSomaTemp){
+            r2.add(new ReservationStation(r));
+        }
+        reservationStationsSoma = new ArrayList<>(r2);    
+        r2.clear();
+        Register[] r3 = new Register[N_Register];
+        for(int i = 0;i<N_Register;i++)
+            r[i] = new Register(rTemp[i]);
         memoriaVariaveis = Arrays.copyOf(memoriaVariaveisTemp, memoriaVariaveisTemp.length);
-        r = Arrays.copyOf(rTemp, rTemp.length);
         
     }
     /*
