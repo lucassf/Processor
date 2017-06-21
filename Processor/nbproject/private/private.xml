@@ -3,10 +3,10 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/C:/Users/lucas/Documents/NetBeansProjects/Processor/src/processor/CommandParser.java</file>
-            <file>file:/C:/Users/lucas/Documents/NetBeansProjects/Processor/src/processor/MainScreen.java</file>
-            <file>file:/C:/Users/lucas/Documents/NetBeansProjects/Processor/src/processor/Operation.java</file>
-            <file>file:/C:/Users/lucas/Documents/NetBeansProjects/Processor/src/processor/Processor.java</file>
+            <file>file:/C:/Users/lucas/Documents/GitHub/Processor/Processor/src/processor/MainScreen.java</file>
+            <file>file:/C:/Users/lucas/Documents/GitHub/Processor/Processor/src/processor/Command.java</file>
+            <file>file:/C:/Users/lucas/Documents/GitHub/Processor/Processor/src/processor/State.java</file>
+            <file>file:/C:/Users/lucas/Documents/GitHub/Processor/Processor/src/processor/Processor.java</file>
         </group>
     </open-files>
 </project-private>

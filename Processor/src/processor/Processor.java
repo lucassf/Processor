@@ -3,39 +3,43 @@ package processor;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Vector;
 
 class RegisterStatus{
-    public int qi;
-    public boolean status;
+    public int qi = 0;
+    public boolean status = false;
 }
 
 class ReservationStation{
-    public String name;
-    public boolean busy;
-    public Operation op;
-    public int vj;
-    public int vk;
-    public int qj;
-    public int qk;
-    public int dest;
-    public String A;
+    public boolean busy = false;
+    public Operation op = Operation.EMPTY;
+    public int vj = -1;
+    public int vk = -1;
+    public int qj = -1;
+    public int qk = -1;
+    public int dest = -1;
+    public String A = "";
 }
 
 class ReorderBuffer{
-    public boolean busy;
-    public Operation instruction;
-    public State state;
-    public int destination;
-    public String value;
+    public boolean busy = false;
+    public Operation instruction = Operation.EMPTY;
+    public State state = State.ISSUER;
+    public int destination = -1;
+    public String value = "";
 }
 
 public class Processor {
+
     
-    private RegisterStatus registerStatus[] = new RegisterStatus[32];
-    private Vector<Command> commands;
-    private Vector<ReorderBuffer> ro;
-    private ReservationStation reservationStations[] = new ReservationStation[12];
+    private final List<RegisterStatus> registerStatus = Arrays.asList(new RegisterStatus[32]);
+    private final List<Command> commands = new ArrayList<>();
+    private final List<ReorderBuffer> ro = new ArrayList<>();
+    private final List<ReservationStation> reservationStations = Arrays.asList(new ReservationStation[12]);
     
     private void readFile(){
         
@@ -44,7 +48,7 @@ public class Processor {
         try(BufferedReader br = new BufferedReader(new FileReader(filename))) {
             String line;
             while ((line = br.readLine()) != null) {
-                commands.add(Command.parseCommand(line.split(" ")[0]));
+                getCommands().add(Command.parseCommand(line.split(" ")[0]));
             }
         }catch(IOException e){
             System.out.println("Erro na leitura");
@@ -58,6 +62,21 @@ public class Processor {
     public void nextClock(){
         
     }
-    
+
+    public List<RegisterStatus> getRegisterStatus() {
+        return Collections.unmodifiableList(registerStatus);
+    }
+
+    public List<Command> getCommands() {
+        return Collections.unmodifiableList(commands);
+    }
+
+    public List<ReorderBuffer> getRo() {
+        return Collections.unmodifiableList(ro);
+    }
+
+    public List<ReservationStation> getReservationStations() {
+        return Collections.unmodifiableList(reservationStations);
+    }
     
 }
