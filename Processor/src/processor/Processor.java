@@ -73,7 +73,19 @@ public class Processor {
         filaDeInstrucoesTemp.add(commands.get(pc/4)); //tem que ser pc/4
         if(!filaDeInstrucoes.isEmpty()){
             Command co = filaDeInstrucoes.get(0);
-            //ver se a estacao de reserv correspondente estar vazia, e adicionar
+            //ver se a estacao de reserv correspondente e adicionar se possivel
+            if (co.isEstacaoMem()){
+                
+            }
+            if(co.isEstacaoMult()){
+                int i;
+                reservationStationsSomaTemp.get(i).busy;
+            }
+            if(co.isEstacaoSoma()){
+                for(int i = 0;i<3;i++)
+                    if (reservationStationsSomaTemp.get(i)
+                        break;
+            }
         }
     }
     /*
