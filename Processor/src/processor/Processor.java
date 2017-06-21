@@ -29,7 +29,14 @@ class ReservationStation{
     public int qk;
     public int A;
 }
-
+class ULA{
+    public boolean busy = false;
+    int contClocks = 0;
+    int timeToFinish;
+    public ULA(int i){
+        this.timeToFinish = i;
+    }
+}
 class ReorderBuffer{
     public boolean busy = false;
     public String instruction;
@@ -42,6 +49,9 @@ class ReorderBuffer{
 
 public class Processor {
     private final int  N_Register = 32;
+    private ULA ulaAdd = new ULA(1);
+    private ULA ulaMult= new ULA(3);
+    private ULA ulaMem = new ULA(4);
     private int pc = 0;
     private int clock = 0;
     private int instructionCounter = 0;
@@ -76,7 +86,7 @@ public class Processor {
             System.out.println("Erro na leitura");
         }
     }    
-    private void initEstacoesReservaERobERegister(){
+    private void initEstacoesReservaERobERegister() throws CloneNotSupportedException{
         for(int i = 0;i<3;i++){
             ReservationStation temp = new ReservationStation();
             temp.busy = false;
@@ -110,6 +120,7 @@ public class Processor {
         for(int i = 0;i<10;i++){
             ReorderBuffer temp = new ReorderBuffer();
             temp.busy = false;
+            temp.clone();
             rob.add(temp); 
             temp = new ReorderBuffer();
             temp.busy = false;
@@ -253,7 +264,12 @@ public class Processor {
         //ATUALIZAR PC
         pc = pc + 4;
     }    
+    
+    public void execute(){
+        //
+    }
     //processador principal
+   
     public void process(){
         //fazer tudo dentro de um loop até acabar!!!!
         issue();
