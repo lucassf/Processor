@@ -14,7 +14,7 @@ class Register{
     public boolean status;
     public int qi = -1;
     public boolean busy = false;
-    public int reorder = 0;
+    public int reorder = 0;    
     
 }
 
@@ -76,7 +76,7 @@ public class Processor {
             System.out.println("Erro na leitura");
         }
     }    
-    private void initEstacoesReservaERob(){
+    private void initEstacoesReservaERobERegister(){
         for(int i = 0;i<3;i++){
             ReservationStation temp = new ReservationStation();
             temp.busy = false;
@@ -115,10 +115,15 @@ public class Processor {
             temp.busy = false;
             robTemp.add(temp); 
         }
+        for(int i = 0;i<N_Register;i++){
+            Register temp = new Register();
+            r[i] = temp;
+            rTemp[i] = temp;
+        }
             
     }
     public Processor(){
-        initEstacoesReservaERob();
+        initEstacoesReservaERobERegister();
         readFile();
     }
     public void issue(){
@@ -202,7 +207,7 @@ public class Processor {
                     }
                     //caso addi rt = rs + imm
                     //load r[rt] = MEM[r[rs] + imm]]
-                    if(co.op == Operation.ADDI || co.op == Operation.LW){
+                    if(co.op == Operation.ADDI || co.op == Operation.LW){                       
                         if(r[co.rs].busy){
                             int h = r[co.rs].reorder;
                             if(rob.get(h).ready){//inst ja concluida
@@ -240,7 +245,7 @@ public class Processor {
                 }
             }
         }        
-        Collections.copy(filaDeInstrucoes, filaDeInstrucoesTemp);
+        filaDeInstrucoes = new ArrayList<>(filaDeInstrucoesTemp);
         if(removeuDaFila){
             filaDeInstrucoes.remove(0);
             filaDeInstrucoesTemp.remove(0);
@@ -255,10 +260,10 @@ public class Processor {
         execute(); //TO DO
         write(); //TO DO
         commit(); //TO DO
-        Collections.copy(rob, robTemp);
-        Collections.copy(reservationStationsMemoria, reservationStationsMemoriaTemp);
-        Collections.copy(reservationStationsMultiplicacao, reservationStationsMultiplicacaoTemp);
-        Collections.copy(reservationStationsSoma, reservationStationsSomaTemp);
+        rob = new ArrayList<>(robTemp);
+        reservationStationsMemoria = new ArrayList<>(reservationStationsMemoriaTemp);
+        reservationStationsMultiplicacao = new ArrayList<>(reservationStationsMultiplicacaoTemp);
+        reservationStationsSoma = new ArrayList<>(reservationStationsSomaTemp);
         memoriaVariaveis = Arrays.copyOf(memoriaVariaveisTemp, memoriaVariaveisTemp.length);
         r = Arrays.copyOf(rTemp, rTemp.length);
         

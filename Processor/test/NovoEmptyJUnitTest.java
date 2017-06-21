@@ -17,7 +17,10 @@ import processor.Processor;
 public class NovoEmptyJUnitTest {
     @Test
     public void NovoEmptyJUnitTest() {
-        //Processor p = new Processor();
+        Processor p = new Processor();
+        for (int i = 0; i < 12; i++){
+            p.issue();
+        }
         /*while(true){
             
         }*/

@@ -90,6 +90,7 @@ public class Command {
             com.T_Dest = com.rd;
         if (com.op == Operation.ADDI || com.op == Operation.LW)
             com.T_Dest = com.rt;
+        com.name = instrucao;
         return com;
     }
      public boolean isR ()
