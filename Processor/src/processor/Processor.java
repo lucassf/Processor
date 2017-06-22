@@ -256,6 +256,18 @@ public class Processor {
                         
                     }
                 }
+                for (ReservationStation re : reservationStationsMemoria){
+                    if(re.qj == b){
+                        
+                    }
+                }
+                for (ReservationStation re : reservationStationsMultiplicacao){
+                    if(re.qj == b){
+                        
+                    }
+                }
+                robTemp.get(b).value = ula.result;
+                robTemp.get(b).ready = true;
                 
             }
             //TO DO: RETIRAR DA ESTACAO DE RESERVA
