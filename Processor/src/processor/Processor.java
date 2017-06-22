@@ -71,6 +71,7 @@ class ULA {
     public int vj = -1;
     public int vk = -1; 
     public int A = -1;
+    public int stationIndex = -1;//estacao de reserva em execucao
     public Operation op;
    // public ReservationStation rStationOperando = null;
 
@@ -158,7 +159,7 @@ public class Processor {
     private int pc = 0;
     private int clock = 0;
     private int instructionCounter = 0;
-    private int[] memoriaVariaveis = new int[1000];
+    private int[] memoriaVariaveis = new int[4000];
     private Register[] regs = new Register[N_Register];
     private Vector<Command> commands = new Vector();
 
@@ -349,6 +350,7 @@ public class Processor {
 
     //TO DO
     //TO DO: AJEITAR ISSUE (vk: valor, vj: end, A; imm)
+    //INCOMPLETO
     public void execute() {
         //add
         if (ulaAdd.busy)  {
@@ -365,6 +367,7 @@ public class Processor {
                         ulaAdd.vj = re.vj;
                         ulaAdd.vk = re.vk;
                         ulaAdd.op = re.op;
+                        ulaAdd.stationIndex = reservationStationsSoma.indexOf(re);
                         ulaAdd.busy = true;
                         ulaAdd.contClocks++;
                         if (ulaAdd.contClocks >= ulaAdd.timeToFinish) {
@@ -392,15 +395,23 @@ public class Processor {
                         ulaMem.vj = reservationStationsMemoria.get(i).vj;
                         ulaMem.A = reservationStationsMemoria.get(i).A;
                         ulaMem.op = reservationStationsMemoria.get(i).op;
+                        ulaMem.stationIndex = i;
                         ulaMem.busy = true;
-                        ulaMem.contClocks++;
-                        if (ulaMem.contClocks >= ulaMem.timeToFinish) {
-                            ulaMem.doFPOperation();
-                            ulaMem.done = true;           
-                        }
+                        ulaMem.contClocks++;                        
                         break;
                     }
-                    //caso load
+                    //caso load,duas etapas ao mesmo tempo                    
+                    //procurar store anterior
+                    boolean storeAnterior = false;
+                    for (int j = 0;j<i;j++)
+                        if (reservationStationsMemoria.get(j).op == Operation.SW)
+                            storeAnterior = true;
+                    //"todos os store em rob anterior tem end diferente"
+                    boolean endDiferente = false;
+                    //INCOMPLETE !!!!!!!!!!!!!!!!!!!!!!!
+                  //  for (int j = 0; j < reservationStationsMemoria.get(i).dest; j++ )
+                     //   if(rob.get(j)  )
+                    
                 }
             }
         }
@@ -418,6 +429,7 @@ public class Processor {
                         ulaMult.vj = re.vj;
                         ulaMult.vk = re.vk;
                         ulaMult.op = re.op;
+                        ulaMult.stationIndex = reservationStationsMultiplicacao.indexOf(re);
                         ulaMult.busy = true;
                         ulaMult.contClocks++;
                         if (ulaMult.contClocks >= ulaMult.timeToFinish) {
@@ -430,11 +442,43 @@ public class Processor {
             }
         }
     }
-    //processador principal
-    public void write(){
-        //NAO ESQUECER DE ULA.DONE e busy = FALSE
+    //processador principal  
+   public void write(){        
+        //procurar algm pronto
+        ULA ulas[] = new ULA[3];
+        ULA utemp;
+        ULA ula = null;
+        ulas[0] = ulaMult; ulas[1] = ulaMem; ulas[2] = ulaAdd;
+        boolean achou = false;
+        for (int i =0;i<3;i++){
+            if(ulas[i].done){
+                utemp = ulas[i];
+                //caso especial do store
+                if(utemp.op == Operation.SW){
+                    achou = (reservationStationsMemoria.get(utemp.stationIndex).qk == -1);
+                    if (achou) {
+                        ula = utemp;
+                        break;
+                    }
+                }
+                else{
+                    achou = true;
+                    ula = utemp;
+                    break;
+                }
+            }
+        }
+        if(achou){
+            if (ula.op == Operation.SW){
+                
+            }
+            else{
+                //caso normal
+            }
+        }
+        
        
-    }
+   }
     public void process() {
         //fazer tudo dentro de um loop até acabar!!!!
         issue();
@@ -475,43 +519,6 @@ public class Processor {
         clock++;
     }
 
-    /*
-    public void issue (Command New_Instruction, int Instruction_index)
-    {
-        int i;
-        for (i = 0; i < N_ReservationStation; i++)
-            if (!reservationStations[i].busy)
-                break;
-        
-        if (i < N_ReservationStation)    //Existe uma estação de reserva vazia.
-        {
-            reservationStations[i].busy = true;
-            New_Instruction.T_Dest = i;
-            if (New_Instruction.isR())
-            {
-                reservationStations[i].qj = FindCorrespondingSource(New_Instruction.rs, Instruction_index);
-                reservationStations[i].qk = FindCorrespondingSource(New_Instruction.rt, Instruction_index);
-            }
-            
-            if (New_Instruction.isI())
-            {
-                reservationStations[i].qj = FindCorrespondingSource(New_Instruction.rd, Instruction_index);
-            }
-            
-        }
-       
-    }*/
-
-    //Percorre todos os índices de 0 a Instruction_index - 1, procurando a instrução com maior índice
-    //de modo que Source_Register seja o registrador de destino, e retorna o índice da estação de reserva
-    //correspondente.
-    /*public int FindCorrespondingSource (int Source_Register, int Instruction_index)
-    {
-        for (int i = Instruction_index - 1; i >= 0; i++)
-            if (commands.get(i).rd == Source_Register)
-                return commands.get(i).T_Dest;
-        return Source_Register;    
-    }*/
     public ArrayList<ReorderBuffer> getRob() {
         return rob;
     }
