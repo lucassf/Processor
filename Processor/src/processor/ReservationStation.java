@@ -78,6 +78,15 @@ class ReservationStation {
             robTemp.get(b).instruction = co.name;
             robTemp.get(b).destination = co.rd;
             robTemp.get(b).ready = false;
+            
+            //INTRUCAO R: R[rd] = R[rs] op R[rt]
+            //Necessita gravar, bloqueia o registrador destino
+            if (co.commandType == CommandType.R) {
+                //grava em rd
+                rTemp.get(co.rd).qi = b;
+                rTemp.get(co.rd).busy = true;
+            }
+        
             //se alguma instrucao grava em rt
             if (regs.get(co.rt).busy) {
                 int h = regs.get(co.rt).qi;
@@ -91,13 +100,6 @@ class ReservationStation {
                 vk = regs.get(co.rt).value;
                 qk = -1;
             }
-        }
-        //INTRUCAO R: R[rd] = R[rs] op R[rt]
-        if (co.commandType == CommandType.R) {
-            //grava em rd
-            robTemp.get(b).destination = co.rd;
-            rTemp.get(co.rd).qi = b;
-            rTemp.get(co.rd).busy = true;
         }
         //caso addi rt = rs + imm
         //load r[rt] = MEM[r[rs] + imm]]
