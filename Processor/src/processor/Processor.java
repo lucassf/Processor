@@ -190,7 +190,6 @@ public class Processor {
         //colocar da memoria na fila
         if (getPc()/4 < commands.size()){
             filaDeInstrucoesTemp.add(commands.get(getPc()/4)); //tem que ser pc/4
-            instructionCounter++;
         }
         //TO DO : verificar se é um jump condicional e fazer a predicao
         
