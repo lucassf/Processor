@@ -59,7 +59,6 @@ class ReservationStation {
         List<Register> rTemp = proc.getRegTemp();
         ArrayList<ReorderBuffer> rob = proc.getRob();
         ArrayList<ReorderBuffer> robTemp = proc.getRobTemp();
-
         name = co.name;
         //tem operandos rs e rt
         if (co.commandType == CommandType.R || co.op == Operation.BEQ
