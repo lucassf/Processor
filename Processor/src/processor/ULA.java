@@ -19,8 +19,9 @@ class ULA {
     public int vj = -1;
     public int vk = -1; 
     public int A = -1;
-    public int stationIndex = -1;//estacao de reserva em execucao
+    public int stationIndex = -1;//endereco estacao de reserva em execucao
     public Operation op;
+    public ReservationStation station; //estacao de reserva em execucao
    // public ReservationStation rStationOperando = null;
 
     public ULA(int i) {

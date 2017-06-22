@@ -45,7 +45,12 @@ class ReservationStation {
         dest = vj = vk = qj = qk = A = -1;
         this.proc = proc;
     }
-   
+    public void clear(){
+        name = "";
+        busy = false;
+        op = Operation.EMPTY;
+        dest = vj = vk = qj = qk = A = -1;
+    }
     public void inserirComando(Command co) {
 
         //encontar um rob nao ocupado

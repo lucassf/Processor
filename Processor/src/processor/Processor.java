@@ -139,6 +139,7 @@ public class Processor {
                         ulaAdd.vj = re.vj;
                         ulaAdd.vk = re.vk;
                         ulaAdd.op = re.op;
+                        ulaAdd.station = re;
                         ulaAdd.stationIndex = reservationStationsSoma.indexOf(re);
                         ulaAdd.busy = true;
                         ulaAdd.contClocks++;
@@ -167,6 +168,7 @@ public class Processor {
                         ulaMem.vj = reservationStationsMemoria.get(i).vj;
                         ulaMem.A = reservationStationsMemoria.get(i).A;
                         ulaMem.op = reservationStationsMemoria.get(i).op;
+                        ulaMem.station = reservationStationsMemoria.get(i);
                         ulaMem.stationIndex = i;
                         ulaMem.busy = true;
                         ulaMem.contClocks++;                        
@@ -201,6 +203,7 @@ public class Processor {
                         ulaMult.vj = re.vj;
                         ulaMult.vk = re.vk;
                         ulaMult.op = re.op;
+                        ulaMult.station = re;
                         ulaMult.stationIndex = reservationStationsMultiplicacao.indexOf(re);
                         ulaMult.busy = true;
                         ulaMult.contClocks++;
@@ -217,14 +220,14 @@ public class Processor {
     //processador principal  
    public void write(){        
         //procurar algm pronto
-        ULA ulas[] = new ULA[3];
-        ULA utemp;
+        ArrayList<ULA> ulas = new ArrayList<>();
         ULA ula = null;
-        ulas[0] = ulaMult; ulas[1] = ulaMem; ulas[2] = ulaAdd;
+        ulas.add(ulaMult);
+        ulas.add(ulaMem);
+        ulas.add(ulaAdd);
         boolean achou = false;
-        for (int i =0;i<3;i++){
-            if(ulas[i].done){
-                utemp = ulas[i];
+        for (ULA utemp : ulas){
+            if(utemp.done){
                 //caso especial do store
                 if(utemp.op == Operation.SW){
                     achou = (reservationStationsMemoria.get(utemp.stationIndex).qk == -1);
@@ -251,26 +254,29 @@ public class Processor {
             }
             else{
                 //caso normal, percorrer todos as estacoes
-                for (ReservationStation re : reservationStationsSoma){
-                    if(re.qj == b){
-                        
-                    }
-                }
-                for (ReservationStation re : reservationStationsMemoria){
-                    if(re.qj == b){
-                        
-                    }
-                }
-                for (ReservationStation re : reservationStationsMultiplicacao){
-                    if(re.qj == b){
-                        
+                ArrayList<ArrayList<ReservationStation>> allStations = new ArrayList<>();
+                allStations.add(reservationStationsSoma);
+                allStations.add(reservationStationsMemoria);
+                allStations.add(reservationStationsMultiplicacao);
+                for (ArrayList<ReservationStation> stations : allStations){
+                    for (ReservationStation rs :stations){
+                        if (rs.qj == b) {
+                            rs.vj = ula.result;
+                            rs.qj = -1;
+                        }
+                        if (rs.qk == b) {
+                            rs.vk = ula.result;
+                            rs.qk = -1;
+                        }
                     }
                 }
                 robTemp.get(b).value = ula.result;
                 robTemp.get(b).ready = true;
                 
             }
-            //TO DO: RETIRAR DA ESTACAO DE RESERVA
+           
+            ula.station.clear();
+            
         }
         
        
