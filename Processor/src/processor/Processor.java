@@ -197,14 +197,14 @@ public class Processor {
                 if(co.commandType == CommandType.R){   
                     //grava em rd
                     robTemp.get(b).destination = co.rd;
-                    rTemp[co.rd].qi = b;
-                    rTemp[co.rd].busy = true;
+                    //rTemp[co.rd].qi = b;
+                    //rTemp[co.rd].busy = true;
                 }
                 //caso addi rt = rs + imm
                 //load r[rt] = MEM[r[rs] + imm]]
                 if(co.op == Operation.ADDI || co.op == Operation.LW){
-                    if(r[co.rs].busy){
-                        int h = r[co.rs].reorder;
+                    if(r.get(co.rs).busy){
+                        int h = r.get(co.rs).reorder;
                         if(rob.get(h).ready){//inst ja concluida
                             res.get(i).vj = rob.get(h).value;
                             res.get(i).qj = -1;
@@ -213,7 +213,7 @@ public class Processor {
                             res.get(i).qj = h;                            
                     }                        
                     else{
-                        res.get(i).vj = r[co.rs].value;
+                        res.get(i).vj = r.get(co.rs).value;
                         res.get(i).qj = -1;
                     }                        
                     res.get(i).busy = true;
@@ -225,8 +225,8 @@ public class Processor {
                     res.get(i).vk = co.immediate;
                     res.get(i).qk = 0;
                     //rt
-                    rTemp[co.rt].qi = b;
-                    rTemp[co.rt].busy = true;
+                    //rTemp[co.rt].qi = b;
+                    //rTemp[co.rt].busy = true;
                     if(co.op == Operation.LW){
                         res.get(i).A = co.immediate;
                     }
