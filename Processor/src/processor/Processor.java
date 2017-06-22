@@ -8,40 +8,40 @@ import java.util.Vector;
 import java.util.Arrays;
 import java.util.List;
 
-class Register{
+class Register {
+
     public int value = 0;
     public boolean status;
-    public int qi = -1; 
+    public int qi = -1;
     public boolean busy = false;
-    public int reorder = -1;
-    
-    public Register(Register r){
+
+    public Register(Register r) {
         this.value = r.value;
         this.status = r.status;
         this.qi = r.qi;
         this.busy = r.busy;
-        this.reorder = r.reorder;
     }
-    public Register(){
+
+    public Register() {
         this.value = 0;
         this.qi = -1;
         this.busy = false;
-        this.reorder = -1;
     }
 }
 
-class ReservationStation{
+class ReservationStation {
+
     public String name;
     public boolean busy;
-    public Operation op;    
+    public Operation op;
     public int dest;
     public int vj;
     public int vk;
     public int qj;
     public int qk;
     public int A;
-    
-    public ReservationStation(ReservationStation r){
+
+    public ReservationStation(ReservationStation r) {
         this.name = r.name;
         this.busy = r.busy;
         this.op = r.op;
@@ -52,41 +52,64 @@ class ReservationStation{
         this.qk = r.qk;
         this.A = r.A;
     }
-    public ReservationStation(){
+
+    public ReservationStation() {
         name = "";
         busy = false;
         op = Operation.EMPTY;
         dest = vj = vk = qj = qk = A = -1;
     }
 }
-class ULA{
+
+class ULA {
+
     public boolean busy = false;
     public boolean done = false;
-    public int result = 0;
+    public int result = -1;// branch: 0 se nao jump, 1 se jump
     public int contClocks = 0;
     public int timeToFinish;
-    public ReservationStation rStationOperando;
-    
-    public ULA(int i){
+    public int vj = 0;
+    public int vk = 0; 
+    public Operation op;
+   // public ReservationStation rStationOperando = null;
+
+    public ULA(int i) {
         this.timeToFinish = i;
     }
-    public int doFPOperation(){
-        if(rStationOperando.op == Operation.ADD || rStationOperando.op == Operation.ADDI)
-            return rStationOperando.vj + rStationOperando.vk;
-        if(rStationOperando.op == Operation.MUL)
-            return rStationOperando.vj * rStationOperando.vk;
-        if(rStationOperando.op == Operation.SUB)
-            return rStationOperando.vj - rStationOperando.vk;
-        if(rStationOperando.op == Operation.BNE)
-            return rStationOperando.vj - rStationOperando.vk;
-        if(rStationOperando.op == Operation.SUB)
-            return rStationOperando.vj - rStationOperando.vk;
-        if(rStationOperando.op == Operation.SUB)
-            return rStationOperando.vj - rStationOperando.vk;
-        return 0; //para as instrucoes que nao tem retorno
+
+    public void doFPOperation() {
+        if (op == Operation.ADD || op == Operation.ADDI) {
+            result = vj + vk;
+        }
+        if (op == Operation.MUL) {
+            result = vj * vk;
+        }
+        if (op == Operation.SUB) {
+            result = vj - vk;
+        }
+        if (op == Operation.BNE) {
+            if (vk != vj)
+                result = 1;
+            else
+                result = 0;
+        }
+        if (op == Operation.BLE ) {
+            if (vj<=vk)
+                result = 1;
+            else
+                result = 0;
+        }
+        if (op == Operation.BEQ ) {
+            if (vj==vk)
+                result = 1;
+            else
+                result = 0;
+        }
     }
 }
-class ReorderBuffer{
+
+class ReorderBuffer {
+
     public boolean busy;
     public String instruction;
     public State state;
@@ -94,8 +117,8 @@ class ReorderBuffer{
     public int destination;
     public String destinationType; //se é Registrador, memoria...
     public int value;
-    
-    public ReorderBuffer(ReorderBuffer r){
+
+    public ReorderBuffer(ReorderBuffer r) {
         this.busy = r.busy;
         this.instruction = r.instruction;
         this.state = r.state;
@@ -104,35 +127,42 @@ class ReorderBuffer{
         this.destinationType = r.destinationType;
         this.value = r.value;
     }
-    public ReorderBuffer(){
+
+    public ReorderBuffer() {
         this.busy = false;
+        instruction = "";
+        state = State.ISSUE;
         this.ready = false;
+        destination = -1;
+        destinationType = "";
+        value = -1;
     }
 }
 
 public class Processor {
-    private final int  N_Register = 32;
+
+    private final int N_Register = 32;
     private final int N_Reservation_Soma = 3;
-    private final int N_Reservation_Mult = 3;
+    private final int N_Reservation_Mult = 2;
     private final int N_Reservation_Mem = 5;
-    
+
     private ULA ulaAdd = new ULA(1);
-    private ULA ulaMult= new ULA(3);
+    private ULA ulaMult = new ULA(3);
     private ULA ulaMem = new ULA(4);
     private int pc = 0;
     private int clock = 0;
     private int instructionCounter = 0;
     private int[] memoriaVariaveis = new int[1000];
-    private Register[] r = new Register[N_Register];
+    private Register[] regs = new Register[N_Register];
     private Vector<Command> commands = new Vector();
-    
+
     //OBS: cuidado se remover algm do rob, vai ter que ajustar indices nos em r[] e nas estacoes
     private ArrayList<ReorderBuffer> rob = new ArrayList<>();
     private ArrayList<Command> filaDeInstrucoes = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsSoma = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMultiplicacao = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMemoria = new ArrayList<>();
-    
+
     //variaveis temporarias, necessarias para simular paralelismo
     private int[] memoriaVariaveisTemp = new int[1000];
     private Register[] rTemp = new Register[N_Register];
@@ -141,237 +171,280 @@ public class Processor {
     private ArrayList<ReservationStation> reservationStationsSomaTemp = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMultiplicacaoTemp = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMemoriaTemp = new ArrayList<>();
-    
-    public void nextClock(){
+
+    public void nextClock() {
         process();
     }
-    
-    private void readFile(){
+
+    private void readFile() {
         Command.setMap();
         String filename = "program.txt";
-        try(BufferedReader br = new BufferedReader(new FileReader(filename))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
             String line;
-            while ((line = br.readLine()) != null) {                
-                commands.add(Command.parseCommand(line.split(";")[0],line.split(";")[1]));
+            while ((line = br.readLine()) != null) {
+                commands.add(Command.parseCommand(line.split(";")[0], line.split(";")[1]));
             }
-        }catch(IOException e){
+        } catch (IOException e) {
             System.out.println("Erro na leitura");
         }
-    }    
-    private void initEstacoesReservaERobERegister(){
-        for(int i = 0;i<N_Reservation_Soma;i++){
+    }
+
+    private void initEstacoesReservaERobERegister() {
+        for (int i = 0; i < N_Reservation_Soma; i++) {
             reservationStationsSoma.add(new ReservationStation());
             reservationStationsSomaTemp.add(new ReservationStation());
         }
-        for(int i = 0;i<N_Reservation_Mult;i++){
+        for (int i = 0; i < N_Reservation_Mult; i++) {
             reservationStationsMultiplicacao.add(new ReservationStation());
-            reservationStationsMultiplicacaoTemp.add(new ReservationStation()); 
+            reservationStationsMultiplicacaoTemp.add(new ReservationStation());
         }
-        for(int i = 0;i<N_Reservation_Mem;i++){
+        for (int i = 0; i < N_Reservation_Mem; i++) {
             reservationStationsMemoria.add(new ReservationStation());
-            reservationStationsMemoriaTemp.add(new ReservationStation()); 
+            reservationStationsMemoriaTemp.add(new ReservationStation());
         }
-        for(int i = 0;i<10;i++){
+        for (int i = 0; i < 10; i++) {
             rob.add(new ReorderBuffer());
-            robTemp.add(new ReorderBuffer()); 
+            robTemp.add(new ReorderBuffer());
         }
-        for(int i = 0;i<N_Register;i++){
+        for (int i = 0; i < N_Register; i++) {
             Register temp = new Register();
-            r[i] = temp;
+            regs[i] = temp;
             rTemp[i] = temp;
         }
-            
+
     }
-    public Processor(){
+
+    public Processor() {
         initEstacoesReservaERobERegister();
         readFile();
     }
-    public void issue(){
+
+    public void issue() {
         //colocar da memoria na fila
-        if (getPc()/4 < commands.size()){
-            filaDeInstrucoesTemp.add(commands.get(getPc()/4)); //tem que ser pc/4
+        if (pc / 4 < commands.size()) {
+            filaDeInstrucoesTemp.add(commands.get(pc / 4)); //tem que ser pc/4
+            instructionCounter++;
         }
         //TO DO : verificar se é um jump condicional e fazer a predicao
-        
+
         //da fila pra estacao de reserva e o rob        
         boolean removeuDaFila = false; //gambiarra
-        if(!filaDeInstrucoes.isEmpty()){
+        if (!filaDeInstrucoes.isEmpty()) {
             Command co = filaDeInstrucoes.get(0);
             //encontrar a estacao de reserva correspondente
-            ArrayList<ReservationStation> res = null;
-            int size = 0;
-            if (co.isEstacaoMem()){
-                res = reservationStationsMemoriaTemp;
-                size = 5;
+            ArrayList<ReservationStation> rs;
+            if (co.isEstacaoMem()) {
+                rs = reservationStationsMemoriaTemp;
             }
-            if(co.isEstacaoMult()){
-                res = reservationStationsMultiplicacaoTemp;     
-                size = 2;
+            else if (co.isEstacaoMult()) {
+                rs = reservationStationsMultiplicacaoTemp;
             }
-            if(co.isEstacaoSoma()){
-               res = reservationStationsSomaTemp;
-               size = 3;
+            else {
+                rs = reservationStationsSomaTemp;
             }
-            for(int i = 0;i<size;i++){
-                if(!res.get(i).busy){
-                    removeuDaFila = true;
-                    //encontar um rob nao ocupado
-                    int b = 30;
-                    for (int j = 0;j<10;j++){
-                        if(!rob.get(j).busy)
-                            b = j;
-                    }
-                    //tem operandos rs e rt
-                    if (co.commandType == CommandType.R || co.op == Operation.BEQ
-                            || co.op == Operation.BLE || co.op == Operation.BNE || co.op == Operation.LW){
-                        //se alguma instrucao grava em rs
-                        if(r[co.rs].busy){
-                            int h = r[co.rs].reorder;
-                            if(rob.get(h).ready){//inst ja concluida
-                                res.get(i).vj = rob.get(h).value;
-                                res.get(i).qj = 0;
-                            }
-                            else
-                                res.get(i).qj = h;                            
-                        }                        
-                        else{
-                            res.get(i).vj = r[co.rs].value;
-                            res.get(i).qj = 0;
-                        }
-                        res.get(i).busy = true;
-                        res.get(i).dest = b;
-                        robTemp.get(b).instruction = co.name;
-                        robTemp.get(b).ready = false;     
-                        //se alguma instrucao grava em rt
-                        if(r[co.rt].busy){
-                            int h = r[co.rt].reorder;
-                            if(rob.get(h).ready){//inst ja concluida
-                                res.get(i).vk = rob.get(h).value;
-                                res.get(i).qk = -1;
-                            }
-                            else
-                                res.get(i).qk = h; 
-                        }
-                        else{
-                            res.get(i).vk = r[co.rt].value;
-                            res.get(i).qk = -1;
-                        }
-                    }
-                    //INTRUCAO R: R[rd] = R[rs] op R[rt]
-                    if(co.commandType == CommandType.R){   
-                        //grava em rd
-                        robTemp.get(b).destination = co.rd;                        
-                        rTemp[co.rd].qi = b;
-                        rTemp[co.rd].busy = true;
-                    }
-                    //caso addi rt = rs + imm
-                    //load r[rt] = MEM[r[rs] + imm]]
-                    if(co.op == Operation.ADDI || co.op == Operation.LW){                       
-                        if(r[co.rs].busy){
-                            int h = r[co.rs].reorder;
-                            if(rob.get(h).ready){//inst ja concluida
-                                res.get(i).vj = rob.get(h).value;
-                                res.get(i).qj = -1;
-                            }
-                            else
-                                res.get(i).qj = h;                            
-                        }                        
-                        else{
-                            res.get(i).vj = r[co.rs].value;
-                            res.get(i).qj = -1;
-                        }                        
-                        res.get(i).busy = true;
-                        res.get(i).dest = b;
-                        robTemp.get(b).instruction = co.name;
-                        robTemp.get(b).destination = co.rt;
-                        robTemp.get(b).ready = false; 
-                        //immediate
-                        res.get(i).vk = co.immediate;
-                        res.get(i).qk = 0;
-                        //rt
-                        rTemp[co.rt].qi = b;
-                        rTemp[co.rt].busy = true;
-                        if(co.op == Operation.LW){
-                            res.get(i).A = co.immediate;
-                        }
-                    }
-                    if(co.op == Operation.SW || co.op == Operation.LW){                        
-                        res.get(i).A = co.immediate;
-                    }
-                    break;
+            for (int r = 0; r < rs.size(); r++) {
+                if (rs.get(r).busy) {
+                    continue;
                 }
+                removeuDaFila = true;
+                //encontar um rob nao ocupado
+                int b = 30;
+                for (int j = 0; j < rob.size(); j++) {
+                    if (!rob.get(j).busy) {
+                        b = j;
+                        break;
+                    }
+                }
+                rs.get(r).name = co.name;
+                //tem operandos rs e rt
+                if (co.commandType == CommandType.R || co.op == Operation.BEQ
+                        || co.op == Operation.BLE || co.op == Operation.BNE || co.op == Operation.LW) {
+                    //se alguma instrucao grava em rs
+                    if (regs[co.rs].busy) {
+                        int h = regs[co.rs].qi;
+                        if (rob.get(h).ready) {//inst ja concluida
+                            rs.get(r).vj = rob.get(h).value;
+                            rs.get(r).qj = 0;
+                        } else {
+                            rs.get(r).qj = h;
+                        }
+                    } else {
+                        rs.get(r).vj = regs[co.rs].value;
+                        rs.get(r).qj = 0;
+                    }
+                    rs.get(r).busy = true;
+                    rs.get(r).dest = b;
+                    robTemp.get(b).instruction = co.name;
+                    robTemp.get(b).destination = co.rd;
+                    robTemp.get(b).ready = false;
+                    //se alguma instrucao grava em rt
+                    if (regs[co.rt].busy) {
+                        int h = regs[co.rt].qi;
+                        if (rob.get(h).ready) {//inst ja concluida
+                            rs.get(r).vk = rob.get(h).value;
+                            rs.get(r).qk = 0;
+                        } else {
+                            rs.get(r).qk = h;
+                        }
+                    } else {
+                        rs.get(r).vk = regs[co.rt].value;
+                        rs.get(r).qk = -1;
+                    }
+                }
+                //INTRUCAO R: R[rd] = R[rs] op R[rt]
+                if (co.commandType == CommandType.R) {
+                    //grava em rd
+                    robTemp.get(b).destination = co.rd;
+                    rTemp[co.rd].qi = b;
+                    rTemp[co.rd].busy = true;
+                }
+                //caso addi rt = rs + imm
+                //load r[rt] = MEM[r[rs] + imm]]
+                if (co.op == Operation.ADDI || co.op == Operation.LW) {
+                    if (regs[co.rs].busy) {
+                        int h = regs[co.rs].qi;
+                        if (rob.get(h).ready) {//inst ja concluida
+                            rs.get(r).vj = rob.get(h).value;
+                            rs.get(r).qj = 0;
+                        } else {
+                            rs.get(r).qj = h;
+                        }
+                    } else {
+                        rs.get(r).vj = regs[co.rs].value;
+                        rs.get(r).qj = 0;
+                    }
+                    rs.get(r).busy = true;
+                    rs.get(r).dest = b;
+                    robTemp.get(b).instruction = co.name;
+                    robTemp.get(b).destination = co.rt;
+                    robTemp.get(b).ready = false;
+                    //immediate
+                    rs.get(r).vk = co.immediate;
+                    rs.get(r).qk = 0;
+                    //rt
+                    rTemp[co.rt].qi = b;
+                    rTemp[co.rt].busy = true;
+                    if (co.op == Operation.LW) {
+                        rs.get(r).A = co.immediate;
+                    }
+                }
+                if (co.op == Operation.SW || co.op == Operation.LW) {
+                    rs.get(r).A = co.immediate;
+                }
+                break;
             }
-        }        
-        filaDeInstrucoes = new ArrayList<>(filaDeInstrucoesTemp);
-        if(removeuDaFila){
-            filaDeInstrucoes.remove(0);
+        }
+        if (removeuDaFila) {
             filaDeInstrucoesTemp.remove(0);
         }
-        //ATUALIZAR PC
-        pc = getPc() + 4;
-    }    
+        filaDeInstrucoes = new ArrayList<>(filaDeInstrucoesTemp);
+        
+    }
+
     //TO DO
-    public void execute(){
+    public void execute() {
         //add
-        if(ulaAdd.busy){
-            if(ulaAdd.contClocks == ulaAdd.timeToFinish){
+        if (ulaAdd.busy)  {
+            ulaAdd.contClocks++;
+            if (ulaAdd.contClocks >= ulaAdd.timeToFinish) {
                 ulaAdd.doFPOperation();
-                //FALTA OS BRANCHES
+                ulaAdd.done = true;           
+            }
+        } else {
+            if(!ulaAdd.done){                
+                //procurar algm pra executar
+                for (ReservationStation re : reservationStationsSoma ){
+                    if (re.qj == -1 && re.qk == -1){
+                        ulaAdd.vj = re.vj;
+                        ulaAdd.vk = re.vk;
+                        ulaAdd.op = re.op;
+                        ulaAdd.busy = true;
+                        ulaAdd.contClocks++;
+                        if (ulaAdd.contClocks >= ulaAdd.timeToFinish) {
+                            ulaAdd.doFPOperation();
+                            ulaAdd.done = true;           
+                        }
+                        break;
+                    }
+                }
             }
         }
-        else{
-            
+        if (ulaMem.busy && !ulaMem.done) {
+
+        } else {
+
         }
-        if(ulaMem.busy){
-            
-        }
-        else{
-            
-        }
-        if(ulaMult.busy){
-            
-        }
-        else{
-            
+        if (ulaMult.busy)  {
+            ulaMult.contClocks++;
+            if (ulaMult.contClocks >= ulaAdd.timeToFinish) {
+                ulaMult.doFPOperation();
+                ulaMult.done = true;           
+            }
+        } else {
+            if(!ulaMult.done){                
+                //procurar algm pra executar
+                for (ReservationStation re : reservationStationsSoma ){
+                    if (re.qj == -1 && re.qk == -1){
+                        ulaMult.vj = re.vj;
+                        ulaMult.vk = re.vk;
+                        ulaMult.op = re.op;
+                        ulaMult.busy = true;
+                        ulaMult.contClocks++;
+                        if (ulaMult.contClocks >= ulaMult.timeToFinish) {
+                            ulaMult.doFPOperation();
+                            ulaMult.done = true;           
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
     //processador principal
-   
-    public void process(){
+    public void write(){
+        //NAO ESQUECER DE ULA.DONE e busy = FALSE
+       
+    }
+    public void process() {
         //fazer tudo dentro de um loop até acabar!!!!
         issue();
         execute(); //TO DO
-    //    write(); //TO DO
-    //    commit(); //TO DO
-        
+        //    write(); //TO DO
+        //    commit(); //TO DO
+
         //OBS: deve ser necessario copiar objeto a objeto, nao a lista  
         ArrayList<ReorderBuffer> rob2 = new ArrayList<>();
-        for (ReorderBuffer r : robTemp){
+        for (ReorderBuffer r : robTemp) {
             rob2.add(new ReorderBuffer(r));
         }
         rob = new ArrayList<>(rob2);
         ArrayList<ReservationStation> r2 = new ArrayList<>();
-        for (ReservationStation r: reservationStationsMemoriaTemp){
+        for (ReservationStation r : reservationStationsMemoriaTemp) {
             r2.add(new ReservationStation(r));
         }
         reservationStationsMemoria = new ArrayList<>(r2);
         r2.clear();
-        for (ReservationStation r: reservationStationsMultiplicacaoTemp){
+        for (ReservationStation r : reservationStationsMultiplicacaoTemp) {
             r2.add(new ReservationStation(r));
         }
-        reservationStationsMultiplicacao = new ArrayList<>(r2);        
+        reservationStationsMultiplicacao = new ArrayList<>(r2);
         r2.clear();
-        for (ReservationStation r: reservationStationsSomaTemp){
+        for (ReservationStation r : reservationStationsSomaTemp) {
             r2.add(new ReservationStation(r));
         }
-        reservationStationsSoma = new ArrayList<>(r2);    
+        reservationStationsSoma = new ArrayList<>(r2);
         r2.clear();
         Register[] r3 = new Register[N_Register];
-        for(int i = 0;i<N_Register;i++)
-            r[i] = new Register(rTemp[i]);
+        for (int i = 0; i < N_Register; i++) {
+            regs[i] = new Register(rTemp[i]);
+        }
         memoriaVariaveis = Arrays.copyOf(memoriaVariaveisTemp, memoriaVariaveisTemp.length);
-        
+
+        //ATUALIZAR PC
+        pc = pc + 4;
+        clock++;
     }
+
     /*
     public void issue (Command New_Instruction, int Instruction_index)
     {
@@ -398,7 +471,7 @@ public class Processor {
         }
        
     }*/
-    
+
     //Percorre todos os índices de 0 a Instruction_index - 1, procurando a instrução com maior índice
     //de modo que Source_Register seja o registrador de destino, e retorna o índice da estação de reserva
     //correspondente.
@@ -409,7 +482,6 @@ public class Processor {
                 return commands.get(i).T_Dest;
         return Source_Register;    
     }*/
-    
     public ArrayList<ReorderBuffer> getRob() {
         return rob;
     }
@@ -439,6 +511,6 @@ public class Processor {
     }
 
     public List<Register> getR() {
-        return Arrays.asList(r);
+        return Arrays.asList(regs);
     }
 }
