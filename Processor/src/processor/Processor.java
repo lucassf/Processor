@@ -469,12 +469,24 @@ public class Processor {
             }
         }
         if(achou){
+            ula.done = false;
+            ula.busy = false;
+            int sIndex = ula.stationIndex;
+            int b = reservationStationsMemoria.get(sIndex).dest;
             if (ula.op == Operation.SW){
-                
+                 //index no rob
+                robTemp.get(b).value = reservationStationsMemoria.get(sIndex).vk;
             }
             else{
-                //caso normal
+                //caso normal, percorrer todos as estacoes
+                for (ReservationStation re : reservationStationsSoma){
+                    if(re.qj == b){
+                        
+                    }
+                }
+                
             }
+            //TO DO: RETIRAR DA ESTACAO DE RESERVA
         }
         
        
