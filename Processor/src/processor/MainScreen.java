@@ -51,21 +51,24 @@ public class MainScreen extends javax.swing.JFrame {
             String A = rs.A==-1?"":String.valueOf(rs.A);
             
             reserveTable.addRow(new String[]{
-                id,
-                type,
-                busy,
-                instruction,
-                destination,
-                vj,
-                vk,
-                qj,
-                qk,
-                A
+                id,type,busy,instruction,destination,vj,vk,qj,qk,A
             });
         }
         
+        count = 1;
+        roTable.setRowCount(0);
         for (ReorderBuffer ro:reorderBuffer){
+            if (!ro.busy)continue;
+            String input = String.valueOf(count++);
+            String busy = ro.busy?"sim":"nao";
+            String instruction = ro.instruction;
+            String state = String.valueOf(ro.state);
+            String destination = "R"+ro.destination;
+            String value = String.valueOf(ro.value);
             
+            roTable.addRow(new String[]{
+                input,busy,instruction,state,destination,value
+            });
         }
         
         int clock = processor.getClock();
