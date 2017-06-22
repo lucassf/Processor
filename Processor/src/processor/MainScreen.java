@@ -13,7 +13,7 @@ public class MainScreen extends javax.swing.JFrame {
     }
 
     private void updateTable(){
-        List<Register> registerStatus = processor.getR();
+        List<Register> registerStatus = processor.getRegisters();
         List<ReorderBuffer> reorderBuffer = processor.getRob();
         List<ReservationStation> reservationStation = new ArrayList<>();
         reservationStation.addAll(processor.getReservationStationsMemoria());
@@ -257,10 +257,7 @@ public class MainScreen extends javax.swing.JFrame {
                                     .addComponent(jLabel2)
                                     .addComponent(jLabel3)
                                     .addComponent(jLabel5)
-                                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                                        .addComponent(jLabel4)
-                                        .addGap(0, 0, 0)))
-                                .addGap(18, 18, 18)
+                                    .addComponent(jLabel4, javax.swing.GroupLayout.Alignment.TRAILING))
                                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                                     .addComponent(instructionsLabel)
                                     .addComponent(pcLabel)

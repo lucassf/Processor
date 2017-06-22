@@ -36,7 +36,6 @@ public class Processor {
     private int[] memoriaVariaveisTemp = new int[1000];
     private Register[] rTemp = new Register[N_Register];
     private ArrayList<ReorderBuffer> robTemp = new ArrayList<>();
-    private ArrayList<Command> filaDeInstrucoesTemp = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsSomaTemp = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMultiplicacaoTemp = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMemoriaTemp = new ArrayList<>();
@@ -60,16 +59,16 @@ public class Processor {
 
     private void initEstacoesReservaERobERegister() {
         for (int i = 0; i < N_Reservation_Soma; i++) {
-            reservationStationsSoma.add(new ReservationStation());
-            reservationStationsSomaTemp.add(new ReservationStation());
+            reservationStationsSoma.add(new ReservationStation(this));
+            reservationStationsSomaTemp.add(new ReservationStation(this));
         }
         for (int i = 0; i < N_Reservation_Mult; i++) {
-            reservationStationsMultiplicacao.add(new ReservationStation());
-            reservationStationsMultiplicacaoTemp.add(new ReservationStation());
+            reservationStationsMultiplicacao.add(new ReservationStation(this));
+            reservationStationsMultiplicacaoTemp.add(new ReservationStation(this));
         }
         for (int i = 0; i < N_Reservation_Mem; i++) {
-            reservationStationsMemoria.add(new ReservationStation());
-            reservationStationsMemoriaTemp.add(new ReservationStation());
+            reservationStationsMemoria.add(new ReservationStation(this));
+            reservationStationsMemoriaTemp.add(new ReservationStation(this));
         }
         for (int i = 0; i < 10; i++) {
             rob.add(new ReorderBuffer());
@@ -91,123 +90,34 @@ public class Processor {
     public void issue() {
         //colocar da memoria na fila
         if (pc / 4 < commands.size()) {
-            filaDeInstrucoesTemp.add(commands.get(pc / 4)); //tem que ser pc/4
+            filaDeInstrucoes.add(commands.get(pc / 4)); //tem que ser pc/4
             instructionCounter++;
         }
         //TO DO : verificar se é um jump condicional e fazer a predicao
 
-        //da fila pra estacao de reserva e o rob        
-        boolean removeuDaFila = false; //gambiarra
-        if (!filaDeInstrucoes.isEmpty()) {
-            Command co = filaDeInstrucoes.get(0);
-            //encontrar a estacao de reserva correspondente
-            ArrayList<ReservationStation> rs;
-            if (co.isEstacaoMem()) {
-                rs = reservationStationsMemoriaTemp;
-            }
-            else if (co.isEstacaoMult()) {
-                rs = reservationStationsMultiplicacaoTemp;
-            }
-            else {
-                rs = reservationStationsSomaTemp;
-            }
-            for (int r = 0; r < rs.size(); r++) {
-                if (rs.get(r).busy) {
-                    continue;
-                }
-                removeuDaFila = true;
-                //encontar um rob nao ocupado
-                int b = 30;
-                for (int j = 0; j < rob.size(); j++) {
-                    if (!rob.get(j).busy) {
-                        b = j;
-                        break;
-                    }
-                }
-                rs.get(r).name = co.name;
-                //tem operandos rs e rt
-                if (co.commandType == CommandType.R || co.op == Operation.BEQ
-                        || co.op == Operation.BLE || co.op == Operation.BNE || co.op == Operation.LW) {
-                    //se alguma instrucao grava em rs
-                    if (regs[co.rs].busy) {
-                        int h = regs[co.rs].qi;
-                        if (rob.get(h).ready) {//inst ja concluida
-                            rs.get(r).vj = rob.get(h).value;
-                            rs.get(r).qj = 0;
-                        } else {
-                            rs.get(r).qj = h;
-                        }
-                    } else {
-                        rs.get(r).vj = regs[co.rs].value;
-                        rs.get(r).qj = 0;
-                    }
-                    rs.get(r).busy = true;
-                    rs.get(r).dest = b;
-                    robTemp.get(b).instruction = co.name;
-                    robTemp.get(b).destination = co.rd;
-                    robTemp.get(b).ready = false;
-                    //se alguma instrucao grava em rt
-                    if (regs[co.rt].busy) {
-                        int h = regs[co.rt].qi;
-                        if (rob.get(h).ready) {//inst ja concluida
-                            rs.get(r).vk = rob.get(h).value;
-                            rs.get(r).qk = 0;
-                        } else {
-                            rs.get(r).qk = h;
-                        }
-                    } else {
-                        rs.get(r).vk = regs[co.rt].value;
-                        rs.get(r).qk = -1;
-                    }
-                }
-                //INTRUCAO R: R[rd] = R[rs] op R[rt]
-                if (co.commandType == CommandType.R) {
-                    //grava em rd
-                    robTemp.get(b).destination = co.rd;
-                    rTemp[co.rd].qi = b;
-                    rTemp[co.rd].busy = true;
-                }
-                //caso addi rt = rs + imm
-                //load r[rt] = MEM[r[rs] + imm]]
-                if (co.op == Operation.ADDI || co.op == Operation.LW) {
-                    if (regs[co.rs].busy) {
-                        int h = regs[co.rs].qi;
-                        if (rob.get(h).ready) {//inst ja concluida
-                            rs.get(r).vj = rob.get(h).value;
-                            rs.get(r).qj = 0;
-                        } else {
-                            rs.get(r).qj = h;
-                        }
-                    } else {
-                        rs.get(r).vj = regs[co.rs].value;
-                        rs.get(r).qj = 0;
-                    }
-                    rs.get(r).busy = true;
-                    rs.get(r).dest = b;
-                    robTemp.get(b).instruction = co.name;
-                    robTemp.get(b).destination = co.rt;
-                    robTemp.get(b).ready = false;
-                    //immediate
-                    rs.get(r).vk = co.immediate;
-                    rs.get(r).qk = 0;
-                    //rt
-                    rTemp[co.rt].qi = b;
-                    rTemp[co.rt].busy = true;
-                    if (co.op == Operation.LW) {
-                        rs.get(r).A = co.immediate;
-                    }
-                }
-                if (co.op == Operation.SW || co.op == Operation.LW) {
-                    rs.get(r).A = co.immediate;
-                }
+        //da fila pra estacao de reserva e o rob
+        if (filaDeInstrucoes.isEmpty()) {
+            return;
+        }
+        Command co = filaDeInstrucoes.get(0);
+        
+        ArrayList<ReservationStation> rs;           //encontrar a estacao de reserva correspondente
+        if (co.isEstacaoMem()) {
+            rs = reservationStationsMemoriaTemp;
+        }
+        else if (co.isEstacaoMult()) {
+            rs = reservationStationsMultiplicacaoTemp;
+        }
+        else {
+            rs = reservationStationsSomaTemp;
+        }
+        for (int r = 0; r < rs.size(); r++) {
+            if (!rs.get(r).busy) {
+                rs.get(r).inserirComando(co);
+                filaDeInstrucoes.remove(0);
                 break;
             }
         }
-        if (removeuDaFila) {
-            filaDeInstrucoesTemp.remove(0);
-        }
-        filaDeInstrucoes = new ArrayList<>(filaDeInstrucoesTemp);
-        
     }
 
     //TO DO
@@ -385,6 +295,10 @@ public class Processor {
         return rob;
     }
 
+    public ArrayList<ReorderBuffer> getRobTemp() {
+        return robTemp;
+    }
+
     public ArrayList<ReservationStation> getReservationStationsSoma() {
         return reservationStationsSoma;
     }
@@ -409,7 +323,20 @@ public class Processor {
         return instructionCounter;
     }
 
-    public List<Register> getR() {
+    public List<Register> getRegisters() {
         return Arrays.asList(regs);
+    }
+
+    public List<Register> getRegTemp() {
+        return Arrays.asList(rTemp);
+    }
+    
+    public int getFirstNonBusyRob() {
+        for (int j = 0; j < rob.size(); j++) {
+            if (!rob.get(j).busy) {
+                return j;
+            }
+        }
+        return -1;
     }
 }
