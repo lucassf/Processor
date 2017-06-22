@@ -13,8 +13,8 @@ public class MainScreen extends javax.swing.JFrame {
     }
 
     private void updateTable(){
-        List<Register> registerStatus = processor.getRegisterStatus();
-        List<ReorderBuffer> reorderBuffer = processor.getRo();
+        List<Register> registerStatus = processor.getR();
+        List<ReorderBuffer> reorderBuffer = processor.getRob();
         List<ReservationStation> reservationStation = new ArrayList<>();
         reservationStation.addAll(processor.getReservationStationsMemoria());
         reservationStation.addAll(processor.getReservationStationsSoma());
