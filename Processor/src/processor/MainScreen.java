@@ -40,7 +40,7 @@ public class MainScreen extends javax.swing.JFrame {
         reserveTable.setRowCount(0);
         for (ReservationStation rs: reservationStation){
             String id = "ER"+count++;
-            String type = rs.name;
+            String type = rs.instruction;
             String busy = rs.busy?"Sim":"Nao";
             String instruction = rs.op == Operation.EMPTY?"":rs.op.toString();
             String destination = rs.dest==-1?"":String.valueOf(rs.dest);

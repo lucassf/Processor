@@ -10,31 +10,28 @@ import java.util.List;
 
 class Register {
 
-    public int value = 0;
+    public int value;
     public boolean status;
-    public int qi = -1;
-    public boolean busy = false;
-    public int reorder = -1;
+    public int qi;
+    public boolean busy;
 
     public Register(Register r) {
         this.value = r.value;
         this.status = r.status;
         this.qi = r.qi;
         this.busy = r.busy;
-        this.reorder = r.reorder;
     }
 
     public Register() {
-        this.value = 0;
+        this.value = -1;
         this.qi = -1;
-        this.busy = false;
-        this.reorder = -1;
+        this.busy = this.status = false;
     }
 }
 
 class ReservationStation {
 
-    public String name;
+    public String instruction;
     public boolean busy;
     public Operation op;
     public int dest;
@@ -45,7 +42,7 @@ class ReservationStation {
     public int A;
 
     public ReservationStation(ReservationStation r) {
-        this.name = r.name;
+        this.instruction = r.instruction;
         this.busy = r.busy;
         this.op = r.op;
         this.dest = r.dest;
@@ -57,7 +54,7 @@ class ReservationStation {
     }
 
     public ReservationStation() {
-        name = "";
+        instruction = "";
         busy = false;
         op = Operation.EMPTY;
         dest = vj = vk = qj = qk = A = -1;
@@ -145,7 +142,7 @@ public class Processor {
     private int clock = 0;
     private int instructionCounter = 0;
     private int[] memoriaVariaveis = new int[1000];
-    private Register[] regs = new Register[N_Register];
+    private Register[] registerStat = new Register[N_Register];
     private Vector<Command> commands = new Vector();
 
     //OBS: cuidado se remover algm do rob, vai ter que ajustar indices nos em r[] e nas estacoes
@@ -157,9 +154,8 @@ public class Processor {
 
     //variaveis temporarias, necessarias para simular paralelismo
     private int[] memoriaVariaveisTemp = new int[1000];
-    private Register[] rTemp = new Register[N_Register];
+    private Register[] registerStateTemp = new Register[N_Register];
     private ArrayList<ReorderBuffer> robTemp = new ArrayList<>();
-    private ArrayList<Command> filaDeInstrucoesTemp = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsSomaTemp = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMultiplicacaoTemp = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMemoriaTemp = new ArrayList<>();
@@ -200,8 +196,8 @@ public class Processor {
         }
         for (int i = 0; i < N_Register; i++) {
             Register temp = new Register();
-            regs[i] = temp;
-            rTemp[i] = temp;
+            registerStat[i] = temp;
+            registerStateTemp[i] = temp;
         }
 
     }
@@ -212,125 +208,88 @@ public class Processor {
     }
 
     public void issue() {
-        //colocar da memoria na fila
-        if (pc / 4 < commands.size()) {
-            filaDeInstrucoesTemp.add(commands.get(pc / 4)); //tem que ser pc/4
-            instructionCounter++;
-        }
+        
         //TO DO : verificar se é um jump condicional e fazer a predicao
 
-        //da fila pra estacao de reserva e o rob        
-        boolean removeuDaFila = false; //gambiarra
+        //da fila pra estacao de reserva e o rob
         if (!filaDeInstrucoes.isEmpty()) {
             Command co = filaDeInstrucoes.get(0);
             //encontrar a estacao de reserva correspondente
-            ArrayList<ReservationStation> rs;
+            ArrayList<ReservationStation> reservationStation;
             if (co.isEstacaoMem()) {
-                rs = reservationStationsMemoriaTemp;
+                reservationStation = reservationStationsMemoriaTemp;
             }
             else if (co.isEstacaoMult()) {
-                rs = reservationStationsMultiplicacaoTemp;
+                reservationStation = reservationStationsMultiplicacaoTemp;
             }
             else {
-                rs = reservationStationsSomaTemp;
+                reservationStation = reservationStationsSomaTemp;
             }
-            for (int r = 0; r < rs.size(); r++) {
-                if (rs.get(r).busy) {
-                    continue;
+            int r = 0, b =0;
+            while (r<reservationStation.size()&&reservationStation.get(r).busy)r++;
+            while (b<rob.size() && rob.get(b).busy)b++;
+            if (r == reservationStation.size() || b==rob.size())return;
+            
+            ReservationStation RS = new ReservationStation();
+            int rs = co.rs;
+            int rd = co.rd;
+            int rt = co.rt;
+            int immediate = co.immediate;
+            
+            robTemp.get(b).ready = false;
+            robTemp.get(b).busy = true;
+            robTemp.get(b).instruction = co.name;
+            robTemp.get(b).state = State.ISSUE;
+            
+            if (registerStat[rs].busy){
+                int h = registerStat[rs].qi;
+                if (rob.get(h).ready){
+                    RS.vj = rob.get(h).value;
+                    RS.qj = -1;
+                }else{
+                    RS.vj = -1;
+                    RS.qj = rob.get(h).value;
                 }
-                removeuDaFila = true;
-                //encontar um rob nao ocupado
-                int b = 30;
-                for (int j = 0; j < rob.size(); j++) {
-                    if (!rob.get(j).busy) {
-                        b = j;
-                        break;
+            }else{
+                RS.vj = registerStat[rs].value;
+                RS.qj = -1;
+            }
+            RS.busy = true;
+            RS.dest = b;
+            RS.instruction = co.name;
+            
+            if (co.isR()){
+                if(registerStat[rt].busy){
+                    int h = registerStat[rt].qi;
+                    if (rob.get(h).ready){
+                        reservationStation.get(r).vk = rob.get(h).value;
+                        reservationStation.get(r).qk = -1;
+                    }else{
+                        reservationStation.get(r).vk = -1;
+                        reservationStation.get(r).qk = rob.get(h).value;
                     }
+                }else{
+                    reservationStation.get(r).vk = registerStat[rt].value;
+                    reservationStation.get(r).qk = -1;
                 }
-                rs.get(r).name = co.name;
-                //tem operandos rs e rt
-                if (co.commandType == CommandType.R || co.op == Operation.BEQ
-                        || co.op == Operation.BLE || co.op == Operation.BNE || co.op == Operation.LW) {
-                    //se alguma instrucao grava em rs
-                    if (regs[co.rs].busy) {
-                        int h = regs[co.rs].reorder;
-                        if (rob.get(h).ready) {//inst ja concluida
-                            rs.get(r).vj = rob.get(h).value;
-                            rs.get(r).qj = 0;
-                        } else {
-                            rs.get(r).qj = h;
-                        }
-                    } else {
-                        rs.get(r).vj = regs[co.rs].value;
-                        rs.get(r).qj = 0;
-                    }
-                    rs.get(r).busy = true;
-                    rs.get(r).dest = b;
-                    robTemp.get(b).instruction = co.name;
-                    robTemp.get(b).destination = co.rd;
-                    robTemp.get(b).ready = false;
-                    //se alguma instrucao grava em rt
-                    if (regs[co.rt].busy) {
-                        int h = regs[co.rt].reorder;
-                        if (rob.get(h).ready) {//inst ja concluida
-                            rs.get(r).vk = rob.get(h).value;
-                            rs.get(r).qk = 0;
-                        } else {
-                            rs.get(r).qk = h;
-                        }
-                    } else {
-                        rs.get(r).vk = regs[co.rt].value;
-                        rs.get(r).qk = -1;
-                    }
-                }
-                //INTRUCAO R: R[rd] = R[rs] op R[rt]
-                if (co.commandType == CommandType.R) {
-                    //grava em rd
-                    robTemp.get(b).destination = co.rd;
-                    rTemp[co.rd].qi = b;
-                    rTemp[co.rd].busy = true;
-                }
-                //caso addi rt = rs + imm
-                //load r[rt] = MEM[r[rs] + imm]]
-                if (co.op == Operation.ADDI || co.op == Operation.LW) {
-                    if (regs[co.rs].busy) {
-                        int h = regs[co.rs].reorder;
-                        if (rob.get(h).ready) {//inst ja concluida
-                            rs.get(r).vj = rob.get(h).value;
-                            rs.get(r).qj = 0;
-                        } else {
-                            rs.get(r).qj = h;
-                        }
-                    } else {
-                        rs.get(r).vj = regs[co.rs].value;
-                        rs.get(r).qj = 0;
-                    }
-                    rs.get(r).busy = true;
-                    rs.get(r).dest = b;
-                    robTemp.get(b).instruction = co.name;
-                    robTemp.get(b).destination = co.rt;
-                    robTemp.get(b).ready = false;
-                    //immediate
-                    rs.get(r).vk = co.immediate;
-                    rs.get(r).qk = 0;
-                    //rt
-                    rTemp[co.rt].qi = b;
-                    rTemp[co.rt].busy = true;
-                    if (co.op == Operation.LW) {
-                        rs.get(r).A = co.immediate;
-                    }
-                }
-                if (co.op == Operation.SW || co.op == Operation.LW) {
-                    rs.get(r).A = co.immediate;
-                }
-                break;
+                robTemp.get(b).destination = rd;
+            }else if (co.isI()){
+                reservationStation.get(r).vk = immediate;
+                reservationStation.get(r).qk = -1;
+                robTemp.get(b).destination = rt;           
+            }if (co.isI()){
+                RS.A = immediate;
+                registerStat[rt].qi = b;
+                registerStat[rt].busy = true;
+                robTemp.get(b).destination = rt;
             }
         }
-        if (removeuDaFila) {
-            filaDeInstrucoesTemp.remove(0);
+        filaDeInstrucoes.remove(0);
+        //colocar da memoria na fila
+        if (pc / 4 < commands.size()) {
+            filaDeInstrucoes.add(commands.get(pc / 4)); //tem que ser pc/4
+            instructionCounter++;
         }
-        filaDeInstrucoes = new ArrayList<>(filaDeInstrucoesTemp);
-        
     }
 
     //TO DO
@@ -388,7 +347,7 @@ public class Processor {
         r2.clear();
         Register[] r3 = new Register[N_Register];
         for (int i = 0; i < N_Register; i++) {
-            regs[i] = new Register(rTemp[i]);
+            registerStat[i] = new Register(registerStateTemp[i]);
         }
         memoriaVariaveis = Arrays.copyOf(memoriaVariaveisTemp, memoriaVariaveisTemp.length);
 
@@ -463,6 +422,6 @@ public class Processor {
     }
 
     public List<Register> getR() {
-        return Arrays.asList(regs);
+        return Arrays.asList(registerStat);
     }
 }
