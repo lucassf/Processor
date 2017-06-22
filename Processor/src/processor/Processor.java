@@ -68,8 +68,9 @@ class ULA {
     public int result = -1;// branch: 0 se nao jump, 1 se jump
     public int contClocks = 0;
     public int timeToFinish;
-    public int vj = 0;
-    public int vk = 0; 
+    public int vj = -1;
+    public int vk = -1; 
+    public int A = -1;
     public Operation op;
    // public ReservationStation rStationOperando = null;
 
@@ -106,6 +107,9 @@ class ULA {
                 result = 0;
         }
     }
+    public void doSwOperation(){
+        result = vj + A;
+    }
 }
 
 class ReorderBuffer {
@@ -117,6 +121,7 @@ class ReorderBuffer {
     public int destination;
     public String destinationType; //se é Registrador, memoria...
     public int value;
+    public int address; //usado nos branches e store
 
     public ReorderBuffer(ReorderBuffer r) {
         this.busy = r.busy;
@@ -126,6 +131,7 @@ class ReorderBuffer {
         this.destination = r.destination;
         this.destinationType = r.destinationType;
         this.value = r.value;
+        this.address = r.address;
     }
 
     public ReorderBuffer() {
@@ -342,6 +348,7 @@ public class Processor {
     }
 
     //TO DO
+    //TO DO: AJEITAR ISSUE (vk: valor, vj: end, A; imm)
     public void execute() {
         //add
         if (ulaAdd.busy)  {
@@ -369,10 +376,33 @@ public class Processor {
                 }
             }
         }
-        if (ulaMem.busy && !ulaMem.done) {
-
+        if (ulaMem.busy) {
+            //TO DO
+            ulaAdd.contClocks++;
+            //caso load
+            
+            //caso store
         } else {
-
+            if(!ulaMem.done){
+                //procurar algm pra executar
+                for (int i = 0;i<N_Reservation_Mem;i++){
+                    //caso store
+                    if (reservationStationsMemoria.get(i).op == Operation.SW && i==0
+                                && reservationStationsMemoria.get(i).qj == -1){                        
+                        ulaMem.vj = reservationStationsMemoria.get(i).vj;
+                        ulaMem.A = reservationStationsMemoria.get(i).A;
+                        ulaMem.op = reservationStationsMemoria.get(i).op;
+                        ulaMem.busy = true;
+                        ulaMem.contClocks++;
+                        if (ulaMem.contClocks >= ulaMem.timeToFinish) {
+                            ulaMem.doFPOperation();
+                            ulaMem.done = true;           
+                        }
+                        break;
+                    }
+                    //caso load
+                }
+            }
         }
         if (ulaMult.busy)  {
             ulaMult.contClocks++;
@@ -383,7 +413,7 @@ public class Processor {
         } else {
             if(!ulaMult.done){                
                 //procurar algm pra executar
-                for (ReservationStation re : reservationStationsSoma ){
+                for (ReservationStation re : reservationStationsMultiplicacao){
                     if (re.qj == -1 && re.qk == -1){
                         ulaMult.vj = re.vj;
                         ulaMult.vk = re.vk;
