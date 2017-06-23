@@ -302,6 +302,40 @@ public class Processor {
         ulaMult = new ULA(ulaMultTemp);
     }
 
+    public void Commit ()
+    {
+	
+	    ArrayList<ReservationStation> allStations = new ArrayList<>();
+        allStations.addAll(reservationStationsSomaTemp);
+        allStations.addAll(reservationStationsMemoriaTemp);
+        allStations.addAll(reservationStationsMultiplicacaoTemp);
+        for (ReservationStation rs : allStations)    //Percorre todas as estações
+	    {
+		    if (rs.Op != SW)    //Se não for store
+		    {
+			    //Se estiver pronto, escreve no registrador de destino
+			    if (rs.ready)
+			    {
+				    int b = rs.dest;
+				    registerStat[b].value = rs.value
+			    }
+            }
+		    else   //Caso do Store
+		    {
+			    //Se estiver pronto, escreve no endereço de destino
+			    if (rs.ready)
+			    {
+				    int TargetAddress = rs.A;
+				    memoriaVariaveis[TargetAddress] = rs.value
+			    }
+		    }
+        }
+    }
+    
+    
+    
+    
+    
     public void process() {
         //fazer tudo dentro de um loop até acabar!!!!
         issue();
