@@ -1,20 +1,16 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package processor;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- *
- * @author Lucas Franca
- */
+enum StationType{
+    ADD, MULT, MEM
+}
+
 class ReservationStation {
 
     public String name;
+    public String instruction;
     public boolean busy;
     public Operation op;
     public int dest;
@@ -36,104 +32,110 @@ class ReservationStation {
         this.qk = r.qk;
         this.A = r.A;
         this.proc = r.proc;
+        this.instruction = r.instruction;
     }
 
-    public ReservationStation(Processor proc) {
-        name = "";
+    public ReservationStation(Processor proc,String name) {
+        this.name = name;
         busy = false;
         op = Operation.EMPTY;
         dest = vj = vk = qj = qk = A = -1;
         this.proc = proc;
     }
-    public void clear(){
+
+    public void clear() {
         name = "";
         busy = false;
         op = Operation.EMPTY;
         dest = vj = vk = qj = qk = A = -1;
     }
-    public void inserirComando(Command command) {
+
+    public boolean inserirComando(Command co) {
 
         //encontar um rob nao ocupado
         int b = proc.getFirstNonBusyRob();
-        if (b == -1) {
-            return;     //rob nao encontrado
+        if (b == -1){
+            return false;     //nenhum rob disponivel
         }
-        List<Register> regs = proc.getRegisters();
+        List<Register> regs = proc.getR();
         List<Register> rTemp = proc.getRegTemp();
         ArrayList<ReorderBuffer> rob = proc.getRob();
         ArrayList<ReorderBuffer> robTemp = proc.getRobTemp();
-        name = command.name;
+
+        instruction = co.instruction;
         
-        //tomasulo issue, todas as instruções
-        if (regs.get(command.rs).busy) {
-            int h = regs.get(command.rs).qi;
-            if (rob.get(h).ready) {//inst ja concluida
-                vj = rob.get(h).value;
-                qj = 0;
-            } else {
-                qj = h;
-            }
-        } else {
-            vj = regs.get(command.rs).value;
-            qj = 0;
-        }
-        busy = true;
-        dest = b;
-        robTemp.get(b).instruction = command.name;
-        robTemp.get(b).destination = command.rd;
+        int rd = co.rd;
+        int rt = co.rt;
+        int rs = co.rs;
+
+        robTemp.get(b).instruction = co.instruction;
         robTemp.get(b).ready = false;
+        robTemp.get(b).busy = true;
 
-        //INTRUCAO R: R[rd] = R[rs] op R[rt]
-        //Necessita gravar, bloqueia o registrador destino
-        if (command.commandType == CommandType.R) {
-            //grava em rd
-            rTemp.get(command.rd).qi = b;
-            rTemp.get(command.rd).busy = true;
-        }
-
-        //se alguma instrucao grava em rt
-        if (regs.get(command.rt).busy) {
-            int h = regs.get(command.rt).qi;
-            if (rob.get(h).ready) {//inst ja concluida
-                vk = rob.get(h).value;
-                qk = 0;
-            } else {
-                qk = h;
-            }
-        } else {
-            vk = regs.get(command.rt).value;
-            qk = -1;
-        }
-            
-        //caso addi rt = rs + imm
-        //load r[rt] = MEM[r[rs] + imm]]
-        if (command.op == Operation.ADDI || command.op == Operation.LW) {
-            if (regs.get(command.rs).busy) {
-                int h = regs.get(command.rs).qi;
+        //tem operandos rs e rt
+        if (co.isR() || co.isI()) {
+            //se alguma instrucao grava em rs
+            if (regs.get(rs).busy) {
+                int h = regs.get(rs).qi;
                 if (rob.get(h).ready) {//inst ja concluida
                     vj = rob.get(h).value;
-                    qj = 0;
+                    qj = -1;
                 } else {
+                    vj = -1;
                     qj = h;
                 }
             } else {
-                vj = regs.get(command.rs).value;
-                qj = 0;
+                vj = regs.get(rs).value;
+                qj = -1;
             }
             busy = true;
             dest = b;
-            robTemp.get(b).instruction = command.name;
-            robTemp.get(b).destination = command.rt;
-            robTemp.get(b).ready = false;
+        }
+
+        //se alguma instrucao grava em rt
+        if (co.isR() || co.op == Operation.BEQ || co.op == Operation.BLE || co.op == Operation.BNE) {
+            if (regs.get(rt).busy) {
+                int h = regs.get(rt).qi;
+                if (rob.get(h).ready) {//inst ja concluida
+                    vk = rob.get(h).value;
+                    qk = -1;
+                } else {
+                    qk = h;
+                    vk = -1;
+                }
+            } else {
+                vk = regs.get(rt).value;
+                qk = -1;
+            }
+        } else {
+            vk = regs.get(co.rt).value;
+            qk = -1;
+        }
+
+        if (co.commandType == CommandType.R) {
+            //grava em rd
+            rTemp.get(rd).qi = b;
+            rTemp.get(rd).busy = true;
+            robTemp.get(b).destination = rd;
+        }
+        //caso addi rt = rs + imm
+        //load r[rt] = MEM[r[rs] + imm]]
+        if (co.op == Operation.ADDI || co.op == Operation.LW) {
+            robTemp.get(b).destination = rt;
             //immediate
-            vk = command.immediate;
-            qk = 0;
+            vk = co.immediate;
+            qk = -1;
             //rt
-            rTemp.get(command.rt).qi = b;
-            rTemp.get(command.rt).busy = true;
+            rTemp.get(co.rt).qi = b;
+            rTemp.get(co.rt).busy = true;
         }
-        if (command.op == Operation.SW || command.op == Operation.LW) {
-            A = command.immediate;
+        if (co.op == Operation.SW || co.op == Operation.LW) {
+            A = co.immediate;
         }
+        
+        //Get the operation
+        this.op = co.op;
+        
+        return true;
     }
 }

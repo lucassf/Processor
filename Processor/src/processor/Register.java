@@ -1,19 +1,10 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package processor;
 
-/**
- *
- * @author Lucas Franca
- */
 class Register {
 
-    public int value = 0;
+    public int value;
     public boolean status;
-    public int qi = -1;
+    public int qi;
     public boolean busy = false;
 
     public Register(Register r) {
@@ -27,5 +18,6 @@ class Register {
         this.value = 0;
         this.qi = -1;
         this.busy = false;
+        this.status = false;
     }
 }

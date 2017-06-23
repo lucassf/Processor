@@ -20,13 +20,36 @@ class ULA {
     public int vk = -1; 
     public int A = -1;
     public int clock;
-  //  public int stationIndex = -1;//endereco estacao de reserva em execucao
     public Operation op;
-    public ReservationStation station; //estacao de reserva em execucao
-   // public ReservationStation rStationOperando = null;
-
+    public int stationId; //estacao de reserva em execucao
+    public StationType stationType;
+    
     public ULA(int i) {
         this.timeToFinish = i;
+    }
+    
+    public ULA(ULA ula) {
+        this.busy = ula.busy;
+        this.done = ula.done;
+        this.result = ula.result;
+        this.contClocks = ula.contClocks;
+        this.timeToFinish = ula.timeToFinish;
+        this.vj = ula.vj;
+        this.vk = ula.vk; 
+        this.A = ula.A;
+        this.clock = ula.clock;
+        this.op = ula.op;
+        this.stationId = ula.stationId;
+    }
+    
+    public void clear() {
+        result = -1;
+        contClocks = 0;
+        vj = -1;
+        vk = -1; 
+        A = -1;
+        busy = false;
+        done = false;
     }
 
     public void doFPOperation(int clock) {
