@@ -318,6 +318,9 @@ public class Processor {
 			    {
 				    int b = rs.dest;
 				    registerStat[b].value = rs.value;
+				    rs.busy = false;
+				    if (registerStat[b].reorder == b)
+					registerStat[b].busy = false;
 			    }
             	    }
 		    else   //Caso do Store
@@ -327,6 +330,7 @@ public class Processor {
 			    {
 				    int TargetAddress = rs.A;
 				    memoriaVariaveis[TargetAddress] = rs.value;
+				    rs.busy = false;
 			    }
 		    }
         }
