@@ -310,23 +310,23 @@ public class Processor {
         allStations.addAll(reservationStationsMemoriaTemp);
         allStations.addAll(reservationStationsMultiplicacaoTemp);
         for (ReservationStation rs : allStations)    //Percorre todas as estações
-	    {
+	{
 		    if (rs.Op != SW)    //Se não for store
 		    {
 			    //Se estiver pronto, escreve no registrador de destino
 			    if (rs.ready)
 			    {
 				    int b = rs.dest;
-				    registerStat[b].value = rs.value
+				    registerStat[b].value = rs.value;
 			    }
-            }
+            	    }
 		    else   //Caso do Store
 		    {
 			    //Se estiver pronto, escreve no endereço de destino
 			    if (rs.ready)
 			    {
 				    int TargetAddress = rs.A;
-				    memoriaVariaveis[TargetAddress] = rs.value
+				    memoriaVariaveis[TargetAddress] = rs.value;
 			    }
 		    }
         }
