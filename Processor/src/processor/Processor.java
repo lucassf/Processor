@@ -8,6 +8,10 @@ import java.util.Vector;
 import java.util.Arrays;
 import java.util.List;
 
+
+
+    //TO DO: AJEITAR ISSUE (vk: valor, vj: end, A; imm)
+
 public class Processor {
 
     private final int N_Register = 32;
@@ -39,6 +43,11 @@ public class Processor {
     private ArrayList<ReservationStation> reservationStationsSomaTemp = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMultiplicacaoTemp = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMemoriaTemp = new ArrayList<>();
+
+    public Processor() {
+        initEstacoesReservaERobERegister();
+        readFile();
+    }
 
     public void nextClock() {
         process();
@@ -82,11 +91,6 @@ public class Processor {
 
     }
 
-    public Processor() {
-        initEstacoesReservaERobERegister();
-        readFile();
-    }
-
     public void issue() {
         //colocar da memoria na fila
         if (pc / 4 < commands.size()) {
@@ -119,40 +123,38 @@ public class Processor {
     }
 
     //TO DO
-    //TO DO: AJEITAR ISSUE (vk: valor, vj: end, A; imm)
-    //INCOMPLETO
-    public void execute() {
-        //add
-        if (ulaAdd.busy) {
-            ulaAdd.contClocks++;
-            if (ulaAdd.contClocks >= ulaAdd.timeToFinish) {
-                ulaAdd.doFPOperation();
-                ulaAdd.done = true;
+    public void executeUlaAddMul(ULA ula){
+        if (ula.busy)  {
+            ula.contClocks++;
+            if (ula.contClocks >= ula.timeToFinish) {
+                ula.doFPOperation();
+                ula.done = true;           
             }
         } else {
-            if (!ulaAdd.done) {
+            if(!ula.done){                
                 //procurar algm pra executar
-                for (ReservationStation re : reservationStationsSoma) {
-                    if (re.qj == -1 && re.qk == -1) {
-                        ulaAdd.vj = re.vj;
-                        ulaAdd.vk = re.vk;
-                        ulaAdd.op = re.op;
-                        ulaAdd.station = re;
-                        ulaAdd.stationIndex = reservationStationsSoma.indexOf(re);
-                        ulaAdd.busy = true;
-                        ulaAdd.contClocks++;
-                        if (ulaAdd.contClocks >= ulaAdd.timeToFinish) {
-                            ulaAdd.doFPOperation();
-                            ulaAdd.done = true;
+                for (ReservationStation re : reservationStationsSoma ){
+                    if (re.qj == -1 && re.qk == -1){
+                        ula.vj = re.vj;
+                        ula.vk = re.vk;
+                        ula.op = re.op;
+                        ula.station = re;
+                        ula.busy = true;
+                        ula.contClocks++;
+                        if (ula.contClocks >= ula.timeToFinish) {
+                            ula.doFPOperation();
+                            ula.done = true;
                         }
                         break;
                     }
                 }
             }
         }
+    }
+    //INCOMPLETO
+    public void executeUlaMem(ULA ula){
         if (ulaMem.busy) {
             //TO DO
-            ulaAdd.contClocks++;
             //caso load
 
             //caso store
@@ -167,7 +169,6 @@ public class Processor {
                         ulaMem.A = reservationStationsMemoria.get(i).A;
                         ulaMem.op = reservationStationsMemoria.get(i).op;
                         ulaMem.station = reservationStationsMemoria.get(i);
-                        ulaMem.stationIndex = i;
                         ulaMem.busy = true;
                         ulaMem.contClocks++;
                         break;
@@ -189,33 +190,11 @@ public class Processor {
                 }
             }
         }
-        if (ulaMult.busy) {
-            ulaMult.contClocks++;
-            if (ulaMult.contClocks >= ulaAdd.timeToFinish) {
-                ulaMult.doFPOperation();
-                ulaMult.done = true;
-            }
-        } else {
-            if (!ulaMult.done) {
-                //procurar algm pra executar
-                for (ReservationStation re : reservationStationsMultiplicacao) {
-                    if (re.qj == -1 && re.qk == -1) {
-                        ulaMult.vj = re.vj;
-                        ulaMult.vk = re.vk;
-                        ulaMult.op = re.op;
-                        ulaMult.station = re;
-                        ulaMult.stationIndex = reservationStationsMultiplicacao.indexOf(re);
-                        ulaMult.busy = true;
-                        ulaMult.contClocks++;
-                        if (ulaMult.contClocks >= ulaMult.timeToFinish) {
-                            ulaMult.doFPOperation();
-                            ulaMult.done = true;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
+    }
+    public void execute() {
+        executeUlaAddMul(ulaAdd);
+        executeUlaAddMul(ulaMult);
+        executeUlaMem(ulaMem); //INCOMPLETO
     }
 
     //processador principal  
@@ -226,49 +205,40 @@ public class Processor {
         ulas.add(ulaMult);
         ulas.add(ulaMem);
         ulas.add(ulaAdd);
-        boolean achou = false;
         for (ULA utemp : ulas) {
-            if (utemp.done) {
+            if (utemp.done && (ula == null || utemp.clock < ula.clock)) {
                 //caso especial do store
-                if (utemp.op == Operation.SW) {
-                    achou = (reservationStationsMemoria.get(utemp.stationIndex).qk == -1);
-                    if (achou) {
+                if(utemp.op == Operation.SW){
+                    if(utemp.station.qk == -1) {
                         ula = utemp;
-                        break;
                     }
-                } else {
-                    achou = true;
+                }
+                else {
                     ula = utemp;
-                    break;
                 }
             }
         }
-        if (!achou) {
-            return;
-        }
-           
-        ula.done = false;
-        ula.busy = false;
-        int sIndex = ula.stationIndex;
-        int b = reservationStationsMemoria.get(sIndex).dest;
-        if (ula.op == Operation.SW) {
-            //index no rob
-            robTemp.get(b).value = reservationStationsMemoria.get(sIndex).vk;
-        } else {
-            //caso normal, percorrer todos as estacoes
-            ArrayList<ArrayList<ReservationStation>> allStations = new ArrayList<>();
-            allStations.add(reservationStationsSoma);
-            allStations.add(reservationStationsMemoria);
-            allStations.add(reservationStationsMultiplicacao);
-            for (ArrayList<ReservationStation> stations : allStations) {
-                for (ReservationStation rs : stations) {
-                    if (rs.qj == b) {
-                        rs.vj = ula.result;
-                        rs.qj = -1;
-                    }
-                    if (rs.qk == b) {
-                        rs.vk = ula.result;
-                        rs.qk = -1;
+        if(ula != null){
+            ula.done = false;
+            ula.busy = false;
+         //   int sIndex = ula.stationIndex;
+            ReservationStation station = ula.station;
+            int b = station.dest;
+            if (ula.op != Operation.SW){
+                ArrayList<ArrayList<ReservationStation>> allStations = new ArrayList<>();
+                allStations.add(reservationStationsSoma);
+                allStations.add(reservationStationsMemoria);
+                allStations.add(reservationStationsMultiplicacao);
+                for (ArrayList<ReservationStation> stations : allStations){
+                    for (ReservationStation rs :stations){
+                        if (rs.qj == b) {
+                            rs.vj = ula.result;
+                            rs.qj = -1;
+                        }
+                        if (rs.qk == b) {
+                            rs.vk = ula.result;
+                            rs.qk = -1;
+                        }
                     }
                 }
             }

@@ -19,7 +19,8 @@ class ULA {
     public int vj = -1;
     public int vk = -1; 
     public int A = -1;
-    public int stationIndex = -1;//endereco estacao de reserva em execucao
+    public int clock;
+  //  public int stationIndex = -1;//endereco estacao de reserva em execucao
     public Operation op;
     public ReservationStation station; //estacao de reserva em execucao
    // public ReservationStation rStationOperando = null;
@@ -28,7 +29,8 @@ class ULA {
         this.timeToFinish = i;
     }
 
-    public void doFPOperation() {
+    public void doFPOperation(int clock) {
+        this.clock = clock;
         if (op == Operation.ADD || op == Operation.ADDI) {
             result = vj + vk;
         }
@@ -57,7 +59,8 @@ class ULA {
                 result = 0;
         }
     }
-    public void doSwOperation(){
+    public void doSwOperation(int clock){
+        this.clock = clock;
         result = vj + A;
     }
 }
