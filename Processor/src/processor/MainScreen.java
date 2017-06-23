@@ -1,5 +1,7 @@
 package processor;
 
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.table.DefaultTableModel;
@@ -26,13 +28,10 @@ public class MainScreen extends javax.swing.JFrame {
         int count = 0;
         
         for(Register rs: registerStatus){
-            String qi = "";
-            String status = rs.busy?"1":"0";
-            if (rs.busy){
-                qi = "ER"+String.valueOf(rs.qi+1);
-            }
+            String qi = rs.busy?String.valueOf(rs.qi+1):"";
+            String vi = rs.value==-1?"?":String.valueOf(rs.value);
             regTable.setValueAt(qi, count%8, 1+3*(count/8));
-            regTable.setValueAt(status, count%8, 2+3*(count/8));
+            regTable.setValueAt(vi, count%8, 2+3*(count/8));
             count++;
         }
         
@@ -40,14 +39,14 @@ public class MainScreen extends javax.swing.JFrame {
         reserveTable.setRowCount(0);
         for (ReservationStation rs: reservationStation){
             String id = "ER"+count++;
-            String type = rs.instruction;
+            String type = rs.name;
             String busy = rs.busy?"Sim":"Nao";
-            String instruction = rs.op == Operation.EMPTY?"":rs.op.toString();
-            String destination = rs.dest==-1?"":String.valueOf(rs.dest);
-            String vj = rs.vj==-1?"":String.valueOf(rs.vj);
+            String instruction = rs.instruction;
+            String destination = rs.dest==-1?"":"#"+String.valueOf(rs.dest+1);
+            String vj = rs.vj==-1?"":"R"+String.valueOf(rs.vj);
             String vk = rs.vk==-1?"":String.valueOf(rs.vk);
-            String qj = rs.qj==-1?"":String.valueOf(rs.qj);
-            String qk = rs.qk==-1?"":String.valueOf(rs.qk);
+            String qj = rs.qj==-1?"":"#"+String.valueOf(rs.qj+1);
+            String qk = rs.qk==-1?"":"#"+String.valueOf(rs.qk+1);
             String A = rs.A==-1?"":String.valueOf(rs.A);
             
             reserveTable.addRow(new String[]{
@@ -63,8 +62,8 @@ public class MainScreen extends javax.swing.JFrame {
             String busy = ro.busy?"sim":"nao";
             String instruction = ro.instruction;
             String state = String.valueOf(ro.state);
-            String destination = "R"+ro.destination;
-            String value = String.valueOf(ro.value);
+            String destination = ro.destination==-1?"":"R"+ro.destination;
+            String value = ro.value==-1?"":String.valueOf(ro.value);
             
             roTable.addRow(new String[]{
                 input,busy,instruction,state,destination,value
@@ -75,10 +74,40 @@ public class MainScreen extends javax.swing.JFrame {
         int instruction = processor.getInstructionCounter();
         int pc = processor.getPc();
         
+        NumberFormat formatter = new DecimalFormat("#0.000");
+        String CPI = instruction==0?"0":String.valueOf(formatter.format((double)clock/instruction));
+        
         clockLabel.setText(String.valueOf(clock));
         pcLabel.setText(String.valueOf(pc));
         instructionsLabel.setText(String.valueOf(instruction));
-        cpiLabel.setText(String.valueOf((double)clock/instruction));
+        cpiLabel.setText(CPI);
+    }
+    
+    void clearTables(){
+        DefaultTableModel regTable = (DefaultTableModel)registerTable.getModel();
+        DefaultTableModel roTable = (DefaultTableModel)ReorderBufferTable.getModel();
+        DefaultTableModel reserveTable = (DefaultTableModel)ReservationTable.getModel();
+        
+        roTable.setRowCount(0);
+        
+        for(int i=0;i<32;i++){
+            regTable.setValueAt("", i%8, 1+3*(i/8));
+            regTable.setValueAt("", i%8, 2+3*(i/8));
+        }
+        reserveTable.setNumRows(0);
+        
+        for (int i=0;i<5;i++){
+            reserveTable.addRow(new String[]{"ER"+String.valueOf(i+1),"Load/Store"});
+        }for (int i=5;i<8;i++){
+            reserveTable.addRow(new String[]{"ER"+String.valueOf(i+1),"Add"});
+        }for (int i=8;i<10;i++){
+            reserveTable.addRow(new String[]{"ER"+String.valueOf(i+1),"Mult"});
+        }
+        
+        clockLabel.setText("?");
+        cpiLabel.setText("?");
+        pcLabel.setText("?");
+        instructionsLabel.setText("?");
     }
     
     @SuppressWarnings("unchecked")
@@ -104,8 +133,10 @@ public class MainScreen extends javax.swing.JFrame {
         cpiLabel = new javax.swing.JLabel();
         pcLabel = new javax.swing.JLabel();
         clockLabel = new javax.swing.JLabel();
+        clearButton = new javax.swing.JToggleButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        setResizable(false);
 
         ReservationTable.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
@@ -118,8 +149,7 @@ public class MainScreen extends javax.swing.JFrame {
                 {"ER7", "Add", null, null, null, null, null, null, null, null},
                 {"ER8", "Add", null, null, null, null, null, null, null, null},
                 {"ER9", "Mult", null, null, null, null, null, null, null, null},
-                {"ER10", "Mult", null, null, null, null, null, null, null, null},
-                {"ER11", "Mult", null, null, null, null, null, null, null, null}
+                {"ER10", "Mult", null, null, null, null, null, null, null, null}
             },
             new String [] {
                 "ID", "Tipo", "Busy", "Instrução", "Dest.", "Vj", "Vk", "Qj", "Qk", "A"
@@ -236,20 +266,30 @@ public class MainScreen extends javax.swing.JFrame {
 
         clockLabel.setText("?");
 
+        clearButton.setText("Clear");
+        clearButton.setEnabled(false);
+        clearButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                clearButtonActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addContainerGap(29, Short.MAX_VALUE)
+                .addContainerGap(37, Short.MAX_VALUE)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
                         .addComponent(startButton)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(nextButton))
+                        .addComponent(nextButton)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(clearButton))
                     .addComponent(jLabel1)
                     .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addGroup(layout.createSequentialGroup()
                                 .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -257,10 +297,8 @@ public class MainScreen extends javax.swing.JFrame {
                                     .addComponent(jLabel2)
                                     .addComponent(jLabel3)
                                     .addComponent(jLabel5)
-                                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                                        .addComponent(jLabel4)
-                                        .addGap(0, 0, 0)))
-                                .addGap(18, 18, 18)
+                                    .addComponent(jLabel4, javax.swing.GroupLayout.Alignment.TRAILING))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                                     .addComponent(instructionsLabel)
                                     .addComponent(pcLabel)
@@ -271,7 +309,7 @@ public class MainScreen extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(label2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 349, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                            .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 413, javax.swing.GroupLayout.PREFERRED_SIZE))))
                 .addContainerGap())
         );
         layout.setVerticalGroup(
@@ -282,7 +320,8 @@ public class MainScreen extends javax.swing.JFrame {
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(startButton)
-                            .addComponent(nextButton))
+                            .addComponent(nextButton)
+                            .addComponent(clearButton))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addComponent(jLabel1))
                     .addComponent(label2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -323,6 +362,7 @@ public class MainScreen extends javax.swing.JFrame {
         if (processor==null)return;
         startButton.setEnabled(false);
         nextButton.setEnabled(true);
+        clearButton.setEnabled(true);
         clockLabel.setText("0");
         pcLabel.setText("0");
         instructionsLabel.setText("0");
@@ -333,6 +373,13 @@ public class MainScreen extends javax.swing.JFrame {
         processor.nextClock();
         updateTable();
     }//GEN-LAST:event_nextButtonActionPerformed
+
+    private void clearButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearButtonActionPerformed
+        clearTables();
+        startButton.setEnabled(true);
+        nextButton.setEnabled(false);
+        clearButton.setEnabled(false);
+    }//GEN-LAST:event_clearButtonActionPerformed
 
     
     public static void main(String args[]) {
@@ -366,6 +413,7 @@ public class MainScreen extends javax.swing.JFrame {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JTable ReorderBufferTable;
     private javax.swing.JTable ReservationTable;
+    private javax.swing.JToggleButton clearButton;
     private javax.swing.JLabel clockLabel;
     private javax.swing.JLabel cpiLabel;
     private javax.swing.JLabel instructionsLabel;

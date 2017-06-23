@@ -10,7 +10,7 @@ enum CommandType{
 public class Command {
     
     private static AbstractMap<String,Operation> operationMap;
-    public String name; //para mostrar na interface depois
+    public String instruction; //para mostrar na interface depois
     public Operation op;
     public int rs;
     public int rt;
@@ -90,7 +90,7 @@ public class Command {
             com.T_Dest = com.rd;
         if (com.op == Operation.ADDI || com.op == Operation.LW)
             com.T_Dest = com.rt;
-        com.name = instrucao;
+        com.instruction = instrucao;
         return com;
     }
      public boolean isR ()
