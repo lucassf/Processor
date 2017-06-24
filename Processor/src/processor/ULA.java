@@ -36,7 +36,6 @@ class ULA {
     }
 
     public void doFPOperation(int clock) {
-        this.nonBusyClock = clock+1;
         if (op == Operation.ADD || op == Operation.ADDI) {
             result = vj + vk;
         }
@@ -66,7 +65,6 @@ class ULA {
         }
     }
     public void doSwOperation(int clock){
-        this.nonBusyClock = clock+1;
         result = vj + A;
     }
     

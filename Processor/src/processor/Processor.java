@@ -38,7 +38,6 @@ public class Processor {
     private final ULA ulaMult = new ULA(3);
     private final ULA ulaMem = new ULA(4);
     private final ArrayList<ReorderBuffer> rob = new ArrayList<>();
-    private final ArrayList<Command> filaDeInstrucoes = new ArrayList<>();
     private final ArrayList<ReservationStation> reservationStationsSoma = new ArrayList<>();
     private final ArrayList<ReservationStation> reservationStationsMultiplicacao = new ArrayList<>();
     private final ArrayList<ReservationStation> reservationStationsMemoria = new ArrayList<>();
@@ -53,12 +52,14 @@ public class Processor {
         System.out.println("Clock " + clock + ", Instruction " + co.instruction + ": " + message);
     }
     
-    public void nextClock() {
-        issue();
-        execute();
-        write();
-        commit();
+    public boolean nextClock() {
+        boolean ret = false;
+        ret = issue() && ret;
+        ret = execute() && ret;
+        ret = write() && ret;
+        ret = commit() && ret;
         clock++;
+        return ret;
     }
 
     private void readFile() {
@@ -97,17 +98,12 @@ public class Processor {
 
     }
 
-    public void issue() {
+    public boolean issue() {
         
-        //TO DO : verificar se é um jump condicional e fazer a predicao
-
-        if (filaDeInstrucoes.isEmpty()) {
-            if (pc / 4 < commands.size()) {
-                filaDeInstrucoes.add(commands.get(pc / 4));
-            }
-            return;
+        if (pc / 4 >= commands.size()) {
+            return false;
         }
-        Command co = filaDeInstrucoes.get(0);
+        Command co = commands.get(pc / 4);
 
         ArrayList<ReservationStation> rs;           //encontrar a estacao de reserva correspondente
         if (co.isEstacaoMem()) {
@@ -137,7 +133,6 @@ public class Processor {
         }
        
         if (hasIssued) {
-            filaDeInstrucoes.remove(0);
             if (co.isR()) pc = pc + 4;
             else if (co.isJ()) pc = co.immediate;
             else{
@@ -152,22 +147,18 @@ public class Processor {
                     pc = pc + 4;
                 }
             }
-            
-            if (pc / 4 < commands.size()) {
-                filaDeInstrucoes.add(commands.get(pc / 4));
-            }
         }
 
         if (!availResStat) {
             log(co, "No ResStat available, issue stalled");
         }
         
+        return true;
     }
 
-    //TO DO
-    public void executeUlaAddMul(ULA ula){
+    public boolean executeUlaAddMul(ULA ula){
         if (ula.toWrite || ula.isBusy(clock)) {
-            return;
+            return true;
         }
         
         //procurar alguém pra executar
@@ -188,7 +179,7 @@ public class Processor {
             }
         }
         if (chosen == null){
-            return;     //nenhuma ResStat pra operar
+            return false;     //nenhuma ResStat pra operar
         }
         ula.vj = chosen.vj;
         ula.vk = chosen.vk;
@@ -199,12 +190,14 @@ public class Processor {
         ula.nonBusyClock = clock + ula.timeToFinish;
         ula.doFPOperation(clock);
         ula.toWrite = true;
-        log(chosen.reorder.co, "started operation, to be finished in clock " + (ula.nonBusyClock - 1));
+        log(chosen.reorder.co, "started operation, to be finished in clock " + (ula.nonBusyClock - 1) + " taking " + ula.timeToFinish + " clocks");
+        
+        return true;
     }
     
-    public void executeUlaMem(ULA ula){
+    public boolean executeUlaMem(ULA ula){
         if (ula.toWrite || ula.isBusy(clock)) {
-            return;
+            return true;
         }
         
         //procurar alguém pra executar
@@ -221,7 +214,7 @@ public class Processor {
             }
         }
         if (chosen == null){
-            return;     //nenhuma ResStat pra operar
+            return false;     //nenhuma ResStat pra operar
         }
         
         if (chosen.op == Operation.LW && chosen.etapaLoad == 1) {
@@ -243,19 +236,24 @@ public class Processor {
             chosen.reorder.state = State.EXECUTE;
             chosen.reorder.readyClock = clock + 1;
             chosen.reorder.value = chosen.vk;
+            chosen.nonBusyClock = clock + 1;
             log(chosen.reorder.co, "finished execute");
         }
         ula.nonBusyClock = clock + ula.timeToFinish;
         
+        return true;
     }
-    public void execute() {
-        executeUlaAddMul(ulaAdd);
-        executeUlaAddMul(ulaMult);
-        executeUlaMem(ulaMem); //INCOMPLETO
+    
+    public boolean execute() {
+        boolean ret = false;
+        ret = executeUlaAddMul(ulaAdd) && ret;
+        ret = executeUlaAddMul(ulaMult) && ret;
+        ret = executeUlaMem(ulaMem) && ret;
+        return ret;
     }
 
     //processador principal  
-    public void write() {
+    public boolean write() {
         //procurar algm pronto
         ArrayList<ULA> ulas = new ArrayList<>();
         ULA ula = null;
@@ -276,7 +274,7 @@ public class Processor {
             }
         }
         if (ula == null) {
-            return;
+            return false;
         }
         
         ReservationStation station = ula.station;
@@ -314,15 +312,17 @@ public class Processor {
         ula.station.nonBusyClock = clock + 1;
         ula.clear();
         ula.nonBusyClock = clock + 1;
+        
+        return true;
     }
 
-    public void commit() {
+    public boolean commit() {
         if (filaRob.isEmpty()){
-            return; //No Rob used
+            return false; //No Rob used
         }
         ReorderBuffer h = filaRob.peek();
         if (!h.isReady(clock)){
-            return; //Not ready
+            return true; //Not ready
         }
         filaRob.poll();
         instructionCounter++;
@@ -344,13 +344,16 @@ public class Processor {
                 ulaAdd.clear();
                 ulaMem.clear();
                 ulaMult.clear();
+                for(int i=0; i<N_Register; i++){
+                    Reg[i].clear();
+                }
                 if (h.value == 1){
                     pc = h.address;
                 }
                 else{
                     pc = h.co.pc + 4;
                 }
-                log(h.co, "prediction failed, Robs cleared");
+                log(h.co, "prediction failed, Robs cleared, pc now at " + pc + "(" + commands.get(pc/4).instruction + ")");
             }
             else {
                 log(h.co, "prediction succedded");
@@ -374,6 +377,8 @@ public class Processor {
                 log(h.co, "written " + h.value + " in Reg[" + h.destination.id + "]");
             }
         }
+        
+        return true;
     }
     
     private boolean hasRobWithAddress(int address) {

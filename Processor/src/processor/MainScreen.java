@@ -72,7 +72,7 @@ public class MainScreen extends javax.swing.JFrame {
             
             ReservationStation res = rob.station;
             if (res.op == Operation.SW){
-                destination = "Mem[" +res.A+ " + R[" +res.qj.id+ "]]";
+                destination = "Mem[" +res.A+ " + R[" + rob.co.rs + "]]";
             }
             
             String value = rob.value == -1 ? "" : String.valueOf(rob.value);
