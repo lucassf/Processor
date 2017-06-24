@@ -125,7 +125,7 @@ public class Processor {
                     hasIssued = true;
                     filaRob.add(rs.get(r).reorder);
                     re = rs.get(r);
-                    log(co, "issued to Rob " + rs.get(r).reorder.id);
+                    log(co, co.op.toString() + " issued to Rob " + rs.get(r).reorder.id + " and ResStat " + re.id);
                 }
                 else{
                     log(co, "No Rob available, issue stalled");
@@ -223,7 +223,7 @@ public class Processor {
             chosen.reorder.state = State.EXECUTE;
             chosen.etapaLoad++;
             ula.nonBusyClock = clock + 1;
-            log(chosen.reorder.co, "finished execute step 1");
+            log(chosen.reorder.co, "finished execute LW step 1");
         }
         else if (chosen.op == Operation.LW && chosen.etapaLoad == 2) {
             //Le Mem[chosen.A]
@@ -233,7 +233,7 @@ public class Processor {
             ula.op = Operation.LW;
             ula.station = chosen;
             ula.nonBusyClock = clock + ula.timeToFinish - 1;
-            log(chosen.reorder.co, "finished execute step 2");
+            log(chosen.reorder.co, "finished execute LW step 2");
         }
         else if (chosen.op == Operation.SW) {
             chosen.reorder.address = chosen.vj + chosen.A;
@@ -243,7 +243,7 @@ public class Processor {
             chosen.reorder.value = chosen.vk;
             chosen.nonBusyClock = clock + 1;
             ula.nonBusyClock = clock + ula.timeToFinish;
-            log(chosen.reorder.co, "finished execute");
+            log(chosen.reorder.co, "finished execute SW");
         }
         log(chosen.reorder.co, "started operation, to be finished in clock " + (ula.nonBusyClock - 1));
         
@@ -322,6 +322,28 @@ public class Processor {
         return true;
     }
 
+    public void clearMistake() {
+        filaRob.clear();
+        ulaAdd.clear();
+        ulaMem.clear();
+        ulaMult.clear();
+        for (int i = 0; i < N_Register; i++) {
+            Reg[i].clear();
+        }
+        for (int i = 0; i < N_ReorderBuffer; i++) {
+            rob.get(i).clear();
+        }
+        for (int i = 0; i < N_Reservation_Mem; i++) {
+            reservationStationsMemoria.get(i).clear();
+        }
+        for (int i = 0; i < N_Reservation_Mult; i++) {
+            reservationStationsMultiplicacao.get(i).clear();
+        }
+        for (int i = 0; i < N_Reservation_Soma; i++) {
+            reservationStationsSoma.get(i).clear();
+        }
+    }
+
     public boolean commit() {
         if (filaRob.isEmpty()){
             return false; //No Rob used
@@ -343,16 +365,6 @@ public class Processor {
         //BEQ, BLQ, BNE
         if (h.co.op == Operation.BEQ || h.co.op == Operation.BLE || h.co.op == Operation.BNE){
             if (prediction !=  h.value){    //mispredicted
-                while(!filaRob.isEmpty()) {
-                    filaRob.peek().clear();
-                    filaRob.poll();
-                }
-                ulaAdd.clear();
-                ulaMem.clear();
-                ulaMult.clear();
-                for(int i=0; i<N_Register; i++){
-                    Reg[i].clear();
-                }
                 if (h.value == 1){
                     pc = h.address;
                 }
@@ -360,6 +372,7 @@ public class Processor {
                     pc = h.co.pc + 4;
                 }
                 log(h.co, "prediction failed, Robs cleared, pc now at " + pc + "(" + commands.get(pc/4).instruction + ")");
+                clearMistake();
             }
             else {
                 log(h.co, "prediction succedded");

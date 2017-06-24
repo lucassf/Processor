@@ -35,13 +35,7 @@ class ReorderBuffer {
         this.co = null;
         destination = null;
         value = -1;
-        if (destination != null) {
-            destination.clear();
-            destination = null;
-        }
-        if (station != null) {
-            station.clear();
-            station = null;
-        }
+        destination = null;
+        station = null;
     }
 }
