@@ -222,6 +222,7 @@ public class Processor {
             chosen.A = chosen.vj + chosen.A;
             chosen.reorder.state = State.EXECUTE;
             chosen.etapaLoad++;
+            ula.nonBusyClock = clock + 1;
             log(chosen.reorder.co, "finished execute step 1");
         }
         else if (chosen.op == Operation.LW && chosen.etapaLoad == 2) {
@@ -231,6 +232,7 @@ public class Processor {
             ula.result = Mem[chosen.A];
             ula.op = Operation.LW;
             ula.station = chosen;
+            ula.nonBusyClock = clock + ula.timeToFinish - 1;
             log(chosen.reorder.co, "finished execute step 2");
         }
         else if (chosen.op == Operation.SW) {
@@ -240,9 +242,10 @@ public class Processor {
             chosen.reorder.readyClock = clock + 1;
             chosen.reorder.value = chosen.vk;
             chosen.nonBusyClock = clock + 1;
+            ula.nonBusyClock = clock + ula.timeToFinish;
             log(chosen.reorder.co, "finished execute");
         }
-        ula.nonBusyClock = clock + ula.timeToFinish;
+        log(chosen.reorder.co, "started operation, to be finished in clock " + (ula.nonBusyClock - 1));
         
         return true;
     }
@@ -301,7 +304,6 @@ public class Processor {
             }
             b.value = ula.result;
             b.address = ula.A;
-            if (ula.op == Operation.LW) System.out.println("written LW");
         }
         else {
             b.value = station.vk;
