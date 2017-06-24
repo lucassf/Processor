@@ -19,6 +19,7 @@ class ReservationStation {
     private Processor proc;
     public ReorderBuffer reorder;
     public int id;
+    public int etapaLoad;
 
     public ReservationStation(Processor proc, String name, int id) {
         clear();
@@ -37,6 +38,7 @@ class ReservationStation {
         vj = vk = A = -1;
         qj = qk = null;
         reorder = null;
+        etapaLoad = -1;
     }
 
     public boolean inserirComando(Command command, int clock) {
@@ -65,7 +67,8 @@ class ReservationStation {
         r.ready = false;
         r.nonBusyClock = Integer.MAX_VALUE;
 
-        //tem operandos rs e rt
+        //instrucao le rs
+        //ADD, ADDI, BEQ, BLE, BNE, LW, MUL, SUB, SW
         if (command.isR() || command.isI()) {
             //se alguma instrucao grava em rs
             if (regs.get(rs).busy) {
@@ -85,7 +88,8 @@ class ReservationStation {
             nonBusyClock = Integer.MAX_VALUE;
         }
 
-        //se alguma instrucao grava em rt
+        //se alguma instrucao le rt
+        //ADD, BEQ, BLE, BNE, MUL, SUB
         if (command.isR() || command.op == Operation.BEQ || command.op == Operation.BLE || command.op == Operation.BNE) {
             if (regs.get(rt).busy) {
                 ReorderBuffer h = regs.get(rt).qi;
@@ -105,8 +109,9 @@ class ReservationStation {
             qk = null;
         }
 
+        //se alguma instrucao escreve em rd
+        //ADD, MUL, SUB
         if (command.commandType == CommandType.R) {
-            //grava em rd
             regs.get(rd).qi = reorder;
             regs.get(rd).busy = true;
             r.destination = rd;
@@ -122,11 +127,20 @@ class ReservationStation {
             regs.get(command.rt).qi = reorder;
             regs.get(command.rt).busy = true;
         }
+        
+        //se a instrução precisa de endereço
+        //LW e SW
         if (command.op == Operation.SW || command.op == Operation.LW) {
             A = command.immediate;
         }
         
-        //Get the operation
+        //Marca a etapa de load
+        //LW
+        if (command.op == Operation.LW) {
+            etapaLoad = 1;
+        }
+        
+        //pega a operação
         this.op = command.op;
         
         return true;

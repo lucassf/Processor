@@ -42,7 +42,10 @@ public class Processor {
     }
 
     public void nextClock() {
-        process();
+        issue();
+        execute();
+        write();
+        clock++;
     }
 
     private void readFile() {
@@ -124,7 +127,8 @@ public class Processor {
         if (ula.operating || ula.isBusy(clock)) {
             return;
         }
-        //procurar algm pra executar
+        
+        //procurar alguém pra executar
         ArrayList<ReservationStation> rList = null;
         if (ula == ulaAdd) {
             rList = reservationStationsSoma;
@@ -132,22 +136,61 @@ public class Processor {
         if (ula == ulaMult) {
             rList = reservationStationsMultiplicacao;
         }
+        ReservationStation chosen = null;
         for (int i = 0; i < rList.size(); i++) {
             ReservationStation re = rList.get(i);
-            if (re.qj == null && re.qk == null && re.op != Operation.EMPTY && clock > re.issuedClock) {
-                ula.vj = re.vj;
-                ula.vk = re.vk;
-                ula.op = re.op;
-                re.reorder.state = State.EXECUTE;
-                ula.station = re;
-                ula.nonBusyClock = clock + ula.timeToFinish;
-                ula.operating = true;
-                break;
+            if (re.qj == null && re.qk == null &&
+                    re.op != Operation.EMPTY && clock > re.issuedClock &&
+                    (chosen == null || chosen.issuedClock > re.issuedClock)) {
+                chosen = re;
             }
         }
+        if (chosen == null){
+            return;     //nenhuma ResStat pra operar
+        }
+        ula.vj = chosen.vj;
+        ula.vk = chosen.vk;
+        ula.op = chosen.op;
+        chosen.reorder.state = State.EXECUTE;
+        ula.station = chosen;
+        ula.nonBusyClock = clock + ula.timeToFinish;
+        ula.doFPOperation(clock);
+        ula.operating = true;
     }
     //INCOMPLETO
     public void executeUlaMem(ULA ula){
+        if (ula.operating || ula.isBusy(clock)) {
+            return;
+        }
+        
+        //procurar alguém pra executar
+        ArrayList<ReservationStation> rList = reservationStationsMemoria;
+        ReservationStation chosen = null;
+        for (int i = 0; i < rList.size(); i++) {
+            ReservationStation re = rList.get(i);
+            if (re.qj == null &&
+                    re.op != Operation.EMPTY && clock > re.issuedClock &&
+                    (chosen == null || chosen.issuedClock > re.issuedClock) &&
+                    (re.etapaLoad == 1 || (re.etapaLoad == 2 && hasRobWithAddress(re.A)))) {
+                chosen = re;
+            }
+        }
+        if (chosen == null){
+            return;     //nenhuma ResStat pra operar
+        }
+        
+        if (chosen.op == Operation.LW && chosen.etapaLoad == 1) {
+            chosen.A = chosen.vj + chosen.A;
+            chosen.reorder.state = State.EXECUTE;
+            chosen.etapaLoad++;
+        }
+        else if (chosen.op == Operation.LW && chosen.etapaLoad == 2) {
+            //Le Mem[chosen.A]
+            chosen.reorder.state = State.EXECUTE;
+            chosen.reorder.ready = true;
+        }
+        ula.nonBusyClock = clock + ula.timeToFinish;
+        
     }
     public void execute() {
         executeUlaAddMul(ulaAdd);
@@ -240,18 +283,11 @@ public class Processor {
         }*/
     }
     
-    
-    
-    
-    
-    public void process() {
-        //fazer tudo dentro de um loop até acabar!!!!
-        issue();
-        execute();
-        write();
-
-        
-        clock++;
+    private boolean hasRobWithAddress(int address) {
+        for(ReorderBuffer r : rob) {
+            if (r.address == address && r.isBusy(clock)) return true;
+        }
+        return false;
     }
 
     public ArrayList<ReorderBuffer> getRob() {
