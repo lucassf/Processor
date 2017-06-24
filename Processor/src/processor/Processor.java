@@ -7,6 +7,7 @@ import java.util.AbstractQueue;
 import java.util.ArrayList;
 import java.util.Vector;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -116,16 +117,17 @@ public class Processor {
         
         boolean hasIssued = false;
         boolean availResStat = false;
+        ReservationStation re = null;
         for (int r = 0; r < rs.size(); r++) {
             if (!rs.get(r).isBusy(clock)) {
                 availResStat = true;
                 if(rs.get(r).inserirComando(co, clock)){
                     hasIssued = true;
                     filaRob.add(rs.get(r).reorder);
+                    re = rs.get(r);
                     log(co, "issued to Rob " + rs.get(r).reorder.id);
                 }
                 else{
-                    System.out.println("Issue failed");
                     log(co, "No Rob available, issue stalled");
                 }
                 break;
@@ -140,8 +142,7 @@ public class Processor {
                     pc = pc + 4;
                 }
                 else if (prediction == 1){
-                    if (co.op == Operation.BEQ || co.op == Operation.BNE) pc = pc + 4 + co.immediate;
-                    else pc = co.immediate;
+                    pc = re.A;
                 }
                 else{
                     pc = pc + 4;
@@ -209,7 +210,7 @@ public class Processor {
                     re.op != Operation.EMPTY && clock > re.issuedClock &&
                     (chosen == null || chosen.issuedClock > re.issuedClock) &&
                     ((re.op == Operation.SW && re.reorder == filaRob.peek())
-                    || re.etapaLoad == 1 || (re.etapaLoad == 2 && hasRobWithAddress(re.A)))) {
+                    || re.etapaLoad == 1 || (re.etapaLoad == 2 && !hasRobWithAddress(re.reorder)))) {
                 chosen = re;
             }
         }
@@ -228,6 +229,8 @@ public class Processor {
             chosen.reorder.state = State.EXECUTE;
             ula.toWrite = true;
             ula.result = Mem[chosen.A];
+            ula.op = Operation.LW;
+            ula.station = chosen;
             log(chosen.reorder.co, "finished execute step 2");
         }
         else if (chosen.op == Operation.SW) {
@@ -298,6 +301,7 @@ public class Processor {
             }
             b.value = ula.result;
             b.address = ula.A;
+            if (ula.op == Operation.LW) System.out.println("written LW");
         }
         else {
             b.value = station.vk;
@@ -363,8 +367,8 @@ public class Processor {
         //Seta a memoria se for store
         //SW
         else if (h.co.op == Operation.SW) {
+            log(h.co, "written " + h.value + " in Mem[" + h.address + "]");
             Mem[h.address] = h.value;
-                log(h.co, "written " + h.value + " in Mem[" + h.address + "]");
         }
         
         //Qualquer outro comando, escreve no registrador
@@ -381,9 +385,11 @@ public class Processor {
         return true;
     }
     
-    private boolean hasRobWithAddress(int address) {
-        for(ReorderBuffer r : rob) {
-            if (r.address == address && r.isBusy(clock)) return true;
+    private boolean hasRobWithAddress(ReorderBuffer cur) {
+        Queue<ReorderBuffer> fila = new LinkedList<>(filaRob);
+        while(fila.peek() != cur){
+            if (fila.peek().address == cur.address) return true;
+            fila.poll();
         }
         return false;
     }
