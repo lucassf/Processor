@@ -134,6 +134,14 @@ class ReservationStation {
             A = command.immediate;
         }
         
+        //branch precisa guardar o endereço no Rob
+        if (command.op == Operation.BEQ || command.op == Operation.BNE){
+            A = command.pc + 4 + command.immediate;
+        }
+        if (command.op == Operation.BLE){
+            A = command.immediate;
+        }
+        
         //Marca a etapa de load
         //LW
         if (command.op == Operation.LW) {

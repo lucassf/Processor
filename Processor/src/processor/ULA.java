@@ -23,6 +23,7 @@ class ULA {
     
     public ULA(int i) {
         this.timeToFinish = i;
+        clear();
     }
     
     public void clear() {

@@ -138,7 +138,21 @@ public class Processor {
        
         if (hasIssued) {
             filaDeInstrucoes.remove(0);
-            pc = pc + 4;
+            if (co.isR()) pc = pc + 4;
+            else if (co.isJ()) pc = co.immediate;
+            else{
+                if (co.op != Operation.BEQ && co.op != Operation.BLE && co.op != Operation.BNE){
+                    pc = pc + 4;
+                }
+                else if (prediction == 1){
+                    if (co.op == Operation.BEQ || co.op == Operation.BNE) pc = pc + 4 + co.immediate;
+                    else pc = co.immediate;
+                }
+                else{
+                    pc = pc + 4;
+                }
+            }
+            
             if (pc / 4 < commands.size()) {
                 filaDeInstrucoes.add(commands.get(pc / 4));
             }
@@ -179,6 +193,7 @@ public class Processor {
         ula.vj = chosen.vj;
         ula.vk = chosen.vk;
         ula.op = chosen.op;
+        ula.A = chosen.A;
         chosen.reorder.state = State.EXECUTE;
         ula.station = chosen;
         ula.nonBusyClock = clock + ula.timeToFinish;
@@ -227,6 +242,7 @@ public class Processor {
             //Escreve Mem[chosen.A]
             chosen.reorder.state = State.EXECUTE;
             chosen.reorder.readyClock = clock + 1;
+            chosen.reorder.value = chosen.vk;
             log(chosen.reorder.co, "finished execute");
         }
         ula.nonBusyClock = clock + ula.timeToFinish;
@@ -283,9 +299,11 @@ public class Processor {
                 }
             }
             b.value = ula.result;
+            b.address = ula.A;
         }
         else {
             b.value = station.vk;
+            b.address = ula.A;
         }
         
         b.readyClock = clock + 1;
@@ -313,6 +331,7 @@ public class Processor {
         //Libera o Rob
         h.state = State.COMMIT;
         h.nonBusyClock = clock + 1;
+        log(h.co, "commited");
         
         //Altera o PC se for branch
         //BEQ, BLQ, BNE
@@ -322,13 +341,19 @@ public class Processor {
                     filaRob.peek().clear();
                     filaRob.poll();
                 }
+                ulaAdd.clear();
+                ulaMem.clear();
+                ulaMult.clear();
+                if (h.value == 1){
+                    pc = h.address;
+                }
+                else{
+                    pc = h.co.pc + 4;
+                }
                 log(h.co, "prediction failed, Robs cleared");
             }
             else {
                 log(h.co, "prediction succedded");
-            }
-            if (h.value == 1){
-                pc = h.address;
             }
         }
         
