@@ -3,138 +3,131 @@ package processor;
 import java.util.ArrayList;
 import java.util.List;
 
-enum StationType{
-    ADD, MULT, MEM
-}
-
 class ReservationStation {
 
     public String name;
     public String instruction;
-    public boolean busy;
+    private int nonBusyClock;
+    public int issuedClock;
+    public int clockInserted;
     public Operation op;
-    public int dest;
     public int vj;
     public int vk;
-    public int qj;
-    public int qk;
+    public ReorderBuffer qj;
+    public ReorderBuffer qk;
     public int A;
-    public Processor proc;
+    private Processor proc;
+    public ReorderBuffer reorder;
+    public int id;
 
-    public ReservationStation(ReservationStation r) {
-        this.name = r.name;
-        this.busy = r.busy;
-        this.op = r.op;
-        this.dest = r.dest;
-        this.vj = r.vj;
-        this.vk = r.vk;
-        this.qj = r.qj;
-        this.qk = r.qk;
-        this.A = r.A;
-        this.proc = r.proc;
-        this.instruction = r.instruction;
-    }
-
-    public ReservationStation(Processor proc,String name) {
+    public ReservationStation(Processor proc, String name, int id) {
+        clear();
         this.name = name;
-        busy = false;
-        op = Operation.EMPTY;
-        dest = vj = vk = qj = qk = A = -1;
         this.proc = proc;
+        this.id = id;
+    }
+    
+    public boolean isBusy(int curClock){
+        return curClock < nonBusyClock;
     }
 
     public void clear() {
-        name = "";
-        busy = false;
+        nonBusyClock = -1;
         op = Operation.EMPTY;
-        dest = vj = vk = qj = qk = A = -1;
+        vj = vk = A = -1;
+        qj = qk = null;
+        reorder = null;
     }
 
-    public boolean inserirComando(Command co) {
+    public boolean inserirComando(Command command, int clock) {
 
         //encontar um rob nao ocupado
-        int b = proc.getFirstNonBusyRob();
-        if (b == -1){
+        ReorderBuffer r = proc.getFirstNonBusyRob();
+        if (r == null){
+            System.out.println("Tried issue, no ROB available");
             return false;     //nenhum rob disponivel
         }
-        List<Register> regs = proc.getR();
-        List<Register> rTemp = proc.getRegTemp();
-        ArrayList<ReorderBuffer> rob = proc.getRob();
-        ArrayList<ReorderBuffer> robTemp = proc.getRobTemp();
-
-        instruction = co.instruction;
         
-        int rd = co.rd;
-        int rt = co.rt;
-        int rs = co.rs;
+        reorder = r;
+        clockInserted = clock;
+        issuedClock = clock;
+        
+        List<Register> regs = proc.getR();
+        ArrayList<ReorderBuffer> rob = proc.getRob();
 
-        robTemp.get(b).instruction = co.instruction;
-        robTemp.get(b).ready = false;
-        robTemp.get(b).busy = true;
+        instruction = command.instruction;
+        
+        int rd = command.rd;
+        int rt = command.rt;
+        int rs = command.rs;
+
+        r.instruction = command.instruction;
+        r.ready = false;
+        r.nonBusyClock = Integer.MAX_VALUE;
 
         //tem operandos rs e rt
-        if (co.isR() || co.isI()) {
+        if (command.isR() || command.isI()) {
             //se alguma instrucao grava em rs
             if (regs.get(rs).busy) {
-                int h = regs.get(rs).qi;
-                if (rob.get(h).ready) {//inst ja concluida
-                    vj = rob.get(h).value;
-                    qj = -1;
-                } else {
+                ReorderBuffer h = regs.get(rs).qi;
+                if (h.ready) {//inst ja concluida
+                    vj = h.value;
+                    qj = null;
+                }
+                else {
                     vj = -1;
                     qj = h;
                 }
             } else {
                 vj = regs.get(rs).value;
-                qj = -1;
+                qj = null;
             }
-            busy = true;
-            dest = b;
+            nonBusyClock = Integer.MAX_VALUE;
         }
 
         //se alguma instrucao grava em rt
-        if (co.isR() || co.op == Operation.BEQ || co.op == Operation.BLE || co.op == Operation.BNE) {
+        if (command.isR() || command.op == Operation.BEQ || command.op == Operation.BLE || command.op == Operation.BNE) {
             if (regs.get(rt).busy) {
-                int h = regs.get(rt).qi;
-                if (rob.get(h).ready) {//inst ja concluida
-                    vk = rob.get(h).value;
-                    qk = -1;
+                ReorderBuffer h = regs.get(rt).qi;
+                if (h.ready) {//inst ja concluida
+                    vk = h.value;
+                    qk = null;
                 } else {
                     qk = h;
                     vk = -1;
                 }
             } else {
                 vk = regs.get(rt).value;
-                qk = -1;
+                qk = null;
             }
         } else {
-            vk = regs.get(co.rt).value;
-            qk = -1;
+            vk = regs.get(command.rt).value;
+            qk = null;
         }
 
-        if (co.commandType == CommandType.R) {
+        if (command.commandType == CommandType.R) {
             //grava em rd
-            rTemp.get(rd).qi = b;
-            rTemp.get(rd).busy = true;
-            robTemp.get(b).destination = rd;
+            regs.get(rd).qi = reorder;
+            regs.get(rd).busy = true;
+            r.destination = rd;
         }
         //caso addi rt = rs + imm
         //load r[rt] = MEM[r[rs] + imm]]
-        if (co.op == Operation.ADDI || co.op == Operation.LW) {
-            robTemp.get(b).destination = rt;
+        if (command.op == Operation.ADDI || command.op == Operation.LW) {
+            r.destination = rt;
             //immediate
-            vk = co.immediate;
-            qk = -1;
+            vk = command.immediate;
+            qk = null;
             //rt
-            rTemp.get(co.rt).qi = b;
-            rTemp.get(co.rt).busy = true;
+            regs.get(command.rt).qi = reorder;
+            regs.get(command.rt).busy = true;
         }
-        if (co.op == Operation.SW || co.op == Operation.LW) {
-            A = co.immediate;
+        if (command.op == Operation.SW || command.op == Operation.LW) {
+            A = command.immediate;
         }
         
         //Get the operation
-        this.op = co.op;
+        this.op = command.op;
         
         return true;
     }

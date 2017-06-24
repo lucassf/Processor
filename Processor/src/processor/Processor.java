@@ -22,9 +22,6 @@ public class Processor {
     private ULA ulaAdd = new ULA(1);
     private ULA ulaMult = new ULA(3);
     private ULA ulaMem = new ULA(4);
-    private ULA ulaAddTemp = new ULA(1);
-    private ULA ulaMultTemp = new ULA(3);
-    private ULA ulaMemTemp = new ULA(4);
     private int pc = 0;
     private int clock = 0;
     private int instructionCounter = 0;
@@ -38,14 +35,6 @@ public class Processor {
     private ArrayList<ReservationStation> reservationStationsSoma = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMultiplicacao = new ArrayList<>();
     private ArrayList<ReservationStation> reservationStationsMemoria = new ArrayList<>();
-
-    //variaveis temporarias, necessarias para simular paralelismo
-    private int[] memoriaVariaveisTemp = new int[1000];
-    private Register[] registerStateTemp = new Register[N_Register];
-    private ArrayList<ReorderBuffer> robTemp = new ArrayList<>();
-    private ArrayList<ReservationStation> reservationStationsSomaTemp = new ArrayList<>();
-    private ArrayList<ReservationStation> reservationStationsMultiplicacaoTemp = new ArrayList<>();
-    private ArrayList<ReservationStation> reservationStationsMemoriaTemp = new ArrayList<>();
 
     public Processor() {
         initEstacoesReservaERobERegister();
@@ -71,25 +60,20 @@ public class Processor {
 
     private void initEstacoesReservaERobERegister() {
         for (int i = 0; i < N_Reservation_Soma; i++) {
-            reservationStationsSoma.add(new ReservationStation(this,"Add"));
-            reservationStationsSomaTemp.add(new ReservationStation(this,"Add"));
+            reservationStationsSoma.add(new ReservationStation(this, "Add", i+1));
         }
         for (int i = 0; i < N_Reservation_Mult; i++) {
-            reservationStationsMultiplicacao.add(new ReservationStation(this,"Mult"));
-            reservationStationsMultiplicacaoTemp.add(new ReservationStation(this,"Mult"));
+            reservationStationsMultiplicacao.add(new ReservationStation(this, "Mult", i+1));
         }
         for (int i = 0; i < N_Reservation_Mem; i++) {
-            reservationStationsMemoria.add(new ReservationStation(this,"Load/Store"));
-            reservationStationsMemoriaTemp.add(new ReservationStation(this,"Load/Store"));
+            reservationStationsMemoria.add(new ReservationStation(this, "Load/Store", i+1));
         }
         for (int i = 0; i < 10; i++) {
-            rob.add(new ReorderBuffer());
-            robTemp.add(new ReorderBuffer());
+            rob.add(new ReorderBuffer(i + 1));
         }
         for (int i = 0; i < N_Register; i++) {
-            Register temp = new Register();
+            Register temp = new Register(i + 1);
             registerStat[i] = temp;
-            registerStateTemp[i] = temp;
         }
 
     }
@@ -99,27 +83,33 @@ public class Processor {
         //TO DO : verificar se é um jump condicional e fazer a predicao
 
         if (filaDeInstrucoes.isEmpty()) {
-            if (pc/4<commands.size())filaDeInstrucoes.add(commands.get(pc / 4));
+            if (pc / 4 < commands.size()) {
+                filaDeInstrucoes.add(commands.get(pc / 4));
+            }
             return;
         }
         Command co = filaDeInstrucoes.get(0);
 
         ArrayList<ReservationStation> rs;           //encontrar a estacao de reserva correspondente
         if (co.isEstacaoMem()) {
-            rs = reservationStationsMemoriaTemp;
+            rs = reservationStationsMemoria;
         } else if (co.isEstacaoMult()) {
-            rs = reservationStationsMultiplicacaoTemp;
+            rs = reservationStationsMultiplicacao;
         } else {
-            rs = reservationStationsSomaTemp;
+            rs = reservationStationsSoma;
         }
+        
+        boolean hasIssued = false;
         for (int r = 0; r < rs.size(); r++) {
-            if (!rs.get(r).busy) {
-                rs.get(r).inserirComando(co);
+            if (!rs.get(r).isBusy(clock)) {
+                if(rs.get(r).inserirComando(co, clock)){
+                    hasIssued = true;
+                }
+                else System.out.println("Issue failed");
                 filaDeInstrucoes.remove(0);
-                System.out.println("issue complete");
                 pc = pc + 4;
                 instructionCounter++;
-                if (pc/4<commands.size()) {
+                if (pc / 4 < commands.size()) {
                     filaDeInstrucoes.add(commands.get(pc / 4));
                 }
                 break;
@@ -131,89 +121,38 @@ public class Processor {
 
     //TO DO
     public void executeUlaAddMul(ULA ula){
-        if (ula.done) return;
-        if (ula.busy) {
-            ula.contClocks++;
-            if (ula.contClocks >= ula.timeToFinish) {
-                System.out.println("operation complete");
-                ula.doFPOperation(clock);
-                ula.done = true;           
-            }
+        if (ula.operating || ula.isBusy(clock)) {
+            return;
         }
-        else {
-            //procurar algm pra executar
-            ArrayList<ReservationStation> rList = null;
-            if (ula == ulaAddTemp) rList = reservationStationsSoma;
-            if (ula == ulaMultTemp) rList = reservationStationsMultiplicacao;
-            for (int i=0; i<rList.size(); i++) {
-                ReservationStation re = rList.get(i);
-                if (re.qj == -1 && re.qk == -1 && re.op != Operation.EMPTY) {
-                    ula.vj = re.vj;
-                    ula.vk = re.vk;
-                    ula.op = re.op;
-                    robTemp.get(re.dest).state = State.EXECUTE;
-                    ula.stationId = i;
-                    if (ula == ulaAddTemp) ula.stationType = StationType.ADD;
-                    if (ula == ulaMultTemp) ula.stationType = StationType.MULT;
-                    ula.busy = true;
-                    ula.contClocks++;
-                    if (ula == ulaAddTemp) System.out.println("operating add");
-                    if (ula == ulaMultTemp) System.out.println("operating mult");
-                    if (ula.contClocks >= ula.timeToFinish) {
-                        System.out.println("operation complete");
-                        ula.doFPOperation(clock);
-                        ula.done = true;
-                    }
-                    break;
-                }
+        //procurar algm pra executar
+        ArrayList<ReservationStation> rList = null;
+        if (ula == ulaAdd) {
+            rList = reservationStationsSoma;
+        }
+        if (ula == ulaMult) {
+            rList = reservationStationsMultiplicacao;
+        }
+        for (int i = 0; i < rList.size(); i++) {
+            ReservationStation re = rList.get(i);
+            if (re.qj == null && re.qk == null && re.op != Operation.EMPTY && clock > re.issuedClock) {
+                ula.vj = re.vj;
+                ula.vk = re.vk;
+                ula.op = re.op;
+                re.reorder.state = State.EXECUTE;
+                ula.station = re;
+                ula.nonBusyClock = clock + ula.timeToFinish;
+                ula.operating = true;
+                break;
             }
         }
     }
     //INCOMPLETO
     public void executeUlaMem(ULA ula){
-        if (ulaMem.busy) {
-            //TO DO
-            //caso load
-
-            //caso store
-        } else {
-            if (!ulaMem.done) {
-                //procurar algm pra executar
-                for (int i = 0; i < N_Reservation_Mem; i++) {
-                    //caso store
-                    if (reservationStationsMemoria.get(i).op == Operation.SW && i == 0
-                            && reservationStationsMemoria.get(i).qj == -1) {
-                        ulaMem.vj = reservationStationsMemoria.get(i).vj;
-                        ulaMem.A = reservationStationsMemoria.get(i).A;
-                        ulaMem.op = reservationStationsMemoria.get(i).op;
-                        ulaMem.stationId = i;
-                        ulaMem.stationType = StationType.MEM;
-                        ulaMem.busy = true;
-                        ulaMem.contClocks++;
-                        break;
-                    }
-                    //caso load,duas etapas ao mesmo tempo                    
-                    //procurar store anterior
-                    boolean storeAnterior = false;
-                    for (int j = 0; j < i; j++) {
-                        if (reservationStationsMemoria.get(j).op == Operation.SW) {
-                            storeAnterior = true;
-                        }
-                    }
-                    //"todos os store em rob anterior tem end diferente"
-                    boolean endDiferente = false;
-                    //INCOMPLETE !!!!!!!!!!!!!!!!!!!!!!!
-                    //  for (int j = 0; j < reservationStationsMemoria.get(i).dest; j++ )
-                    //   if(rob.get(j)  )
-
-                }
-            }
-        }
     }
     public void execute() {
-        executeUlaAddMul(ulaAddTemp);
-        executeUlaAddMul(ulaMultTemp);
-        executeUlaMem(ulaMemTemp); //INCOMPLETO
+        executeUlaAddMul(ulaAdd);
+        executeUlaAddMul(ulaMult);
+        executeUlaMem(ulaMem); //INCOMPLETO
     }
 
     //processador principal  
@@ -225,10 +164,10 @@ public class Processor {
         ulas.add(ulaMem);
         ulas.add(ulaAdd);
         for (ULA utemp : ulas) {
-            if (utemp.done && (ula == null || utemp.clock < ula.clock)) {
+            if (utemp.operating && !utemp.isBusy(clock) && (ula == null || utemp.nonBusyClock < ula.nonBusyClock)) {
                 //caso especial do store
                 if(utemp.op == Operation.SW){
-                    if(getStation(utemp).qk == -1) {
+                    if(utemp.station.qk == null) {
                         ula = utemp;
                     }
                 }
@@ -240,100 +179,65 @@ public class Processor {
         if (ula == null) {
             return;
         }
-        //modificacoes devem ser feitas nas ula temp
-        if (ula == ulaAdd) ula = ulaAddTemp;
-        if (ula == ulaMult) ula = ulaMultTemp;
-        if (ula == ulaMem) ula = ulaMemTemp;
         
-        ReservationStation station = getStation(ula);
-        int b = station.dest;
+        ReservationStation station = ula.station;
+        ReorderBuffer b = station.reorder;
         if (ula.op != Operation.SW) {
             ArrayList<ReservationStation> allStations = new ArrayList<>();
-            allStations.addAll(reservationStationsSomaTemp);
-            allStations.addAll(reservationStationsMemoriaTemp);
-            allStations.addAll(reservationStationsMultiplicacaoTemp);
+            allStations.addAll(reservationStationsSoma);
+            allStations.addAll(reservationStationsMemoria);
+            allStations.addAll(reservationStationsMultiplicacao);
             for (ReservationStation rs : allStations) {
                 if (rs.qj == b) {
                     rs.vj = ula.result;
-                    rs.qj = -1;
+                    rs.qj = null;
                 }
                 if (rs.qk == b) {
                     rs.vk = ula.result;
-                    rs.qk = -1;
+                    rs.qk = null;
                 }
             }
+            b.value = ula.result;
+            b.ready = true;
+            b.state = State.WRITE;
         }
-        robTemp.get(b).value = ula.result;
-        robTemp.get(b).ready = true;
-        robTemp.get(b).state = State.WRITE;
+        else {
+            
+        }
 
-        getStationTemp(ula).clear();
+        ula.station.clear();
         ula.clear();
     }
-    
-    private void copyRsAndRob() {
-        rob.clear();
-        for (ReorderBuffer r : robTemp) {
-            rob.add(new ReorderBuffer(r));
-        }
-        
-        reservationStationsMemoria.clear();
-        for (ReservationStation r : reservationStationsMemoriaTemp) {
-            reservationStationsMemoria.add(new ReservationStation(r));
-        }
-        
-        reservationStationsMultiplicacao.clear();
-        for (ReservationStation r : reservationStationsMultiplicacaoTemp) {
-            reservationStationsMultiplicacao.add(new ReservationStation(r));
-        }
-        
-        reservationStationsSoma.clear();
-        for (ReservationStation r : reservationStationsSomaTemp) {
-            reservationStationsSoma.add(new ReservationStation(r));
-        }
-        
-        for (int i = 0; i < N_Register; i++) {
-            registerStat[i] = new Register(registerStateTemp[i]);
-        }
-        memoriaVariaveis = Arrays.copyOf(memoriaVariaveisTemp, memoriaVariaveisTemp.length);
-    
-        ulaAdd = new ULA(ulaAddTemp);
-        ulaMem = new ULA(ulaMemTemp);
-        ulaMult = new ULA(ulaMultTemp);
-    }
 
-    public void Commit ()
-    {
-	
-	    ArrayList<ReservationStation> allStations = new ArrayList<>();
+    public void Commit() {
+
+        /*ArrayList<ReservationStation> allStations = new ArrayList<>();
         allStations.addAll(reservationStationsSomaTemp);
         allStations.addAll(reservationStationsMemoriaTemp);
         allStations.addAll(reservationStationsMultiplicacaoTemp);
-        for (ReservationStation rs : allStations)    //Percorre todas as estações
-	{
-		    if (rs.Op != SW)    //Se não for store
-		    {
-			    //Se estiver pronto, escreve no registrador de destino
-			    if (rs.ready)
-			    {
-				    int b = rs.dest;
-				    registerStat[b].value = rs.value;
-				    rs.busy = false;
-				    if (registerStat[b].reorder == b)
-					registerStat[b].busy = false;
-			    }
-            	    }
-		    else   //Caso do Store
-		    {
-			    //Se estiver pronto, escreve no endereço de destino
-			    if (rs.ready)
-			    {
-				    int TargetAddress = rs.A;
-				    memoriaVariaveis[TargetAddress] = rs.value;
-				    rs.busy = false;
-			    }
-		    }
-        }
+        for (ReservationStation rs : allStations) //Percorre todas as estações
+        {
+            if (rs.op != Operation.SW) //Se não for store
+            {
+                //Se estiver pronto, escreve no registrador de destino
+                if (rs.ready) {
+                    int b = rs.dest;
+                    registerStat[b].value = rs.value;
+                    rs.busy = false;
+                    if (registerStat[b].reorder == b) {
+                        registerStat[b].busy = false;
+                    }
+                }
+            } else //Caso do Store
+            {
+                //Se estiver pronto, escreve no endereço de destino
+                if (rs.ready) {
+                    int TargetAddress = rs.A;
+                    memoriaVariaveis[TargetAddress] = rs.value;
+                    rs.busy = false;
+                }
+            }
+        }*/
     }
     
     
@@ -345,43 +249,13 @@ public class Processor {
         issue();
         execute();
         write();
-        //    commit(); //TO DO
-
-        //OBS: deve ser necessario copiar objeto a objeto, nao a lista  
-        copyRsAndRob();
 
         
         clock++;
     }
-    
-    public ReservationStation getStation(ULA ula) {
-        return getResStat(ula.stationId, ula.stationType);
-    }
-    
-    public ReservationStation getStationTemp(ULA ula) {
-        return getResStatTemp(ula.stationId, ula.stationType);
-    }
-    
-    public ReservationStation getResStat(int i, StationType t) {
-        if (t == StationType.ADD) return reservationStationsSoma.get(i);
-        if (t == StationType.MULT) return reservationStationsMultiplicacao.get(i);
-        if (t == StationType.MEM) return reservationStationsMemoria.get(i);
-        return null;
-    }
-    
-    public ReservationStation getResStatTemp(int i, StationType t) {
-        if (t == StationType.ADD) return reservationStationsSomaTemp.get(i);
-        if (t == StationType.MULT) return reservationStationsMultiplicacaoTemp.get(i);
-        if (t == StationType.MEM) return reservationStationsMemoriaTemp.get(i);
-        return null;
-    }
 
     public ArrayList<ReorderBuffer> getRob() {
         return rob;
-    }
-
-    public ArrayList<ReorderBuffer> getRobTemp() {
-        return robTemp;
     }
 
     public ArrayList<ReservationStation> getReservationStationsSoma() {
@@ -412,16 +286,12 @@ public class Processor {
         return Arrays.asList(registerStat);
     }
 
-    public List<Register> getRegTemp() {
-        return Arrays.asList(registerStateTemp);
-    }
-
-    public int getFirstNonBusyRob() {
-        for (int j = 0; j < rob.size(); j++) {
-            if (!rob.get(j).busy) {
-                return j;
+    public ReorderBuffer getFirstNonBusyRob() {
+        for (ReorderBuffer r : rob) {
+            if (!r.isBusy(clock)) {
+                return r;
             }
         }
-        return -1;
+        return null;
     }
 }

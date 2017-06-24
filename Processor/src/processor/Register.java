@@ -4,20 +4,15 @@ class Register {
 
     public int value;
     public boolean status;
-    public int qi;
+    public ReorderBuffer qi;
     public boolean busy = false;
+    public int id;
 
-    public Register(Register r) {
-        this.value = r.value;
-        this.status = r.status;
-        this.qi = r.qi;
-        this.busy = r.busy;
-    }
-
-    public Register() {
+    public Register(int id) {
         this.value = 0;
-        this.qi = -1;
+        this.qi = null;
         this.busy = false;
         this.status = false;
+        this.id = id;
     }
 }

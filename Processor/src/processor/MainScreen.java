@@ -28,49 +28,52 @@ public class MainScreen extends javax.swing.JFrame {
         int count = 0;
         
         for(Register rs: registerStatus){
-            String qi = rs.busy?String.valueOf(rs.qi+1):"";
+            String qi = rs.busy?String.valueOf(rs.qi.id):"";
             String vi = rs.value==-1?"?":String.valueOf(rs.value);
             regTable.setValueAt(qi, count%8, 1+3*(count/8));
             regTable.setValueAt(vi, count%8, 2+3*(count/8));
             count++;
         }
         
+        int clock = processor.getClock();
+        
         count = 1;
         reserveTable.setRowCount(0);
         for (ReservationStation rs: reservationStation){
             String id = "ER"+count++;
             String type = rs.name;
-            String busy = rs.busy?"Sim":"Nao";
+            String busy = rs.isBusy(clock)?"Sim":"Nao";
             String instruction = rs.instruction;
-            String destination = rs.dest==-1?"":"#"+String.valueOf(rs.dest+1);
+            String destination = rs.reorder==null?"":"#"+String.valueOf(rs.id);
             String vj = rs.vj==-1?"":"R"+String.valueOf(rs.vj);
             String vk = rs.vk==-1?"":String.valueOf(rs.vk);
-            String qj = rs.qj==-1?"":"#"+String.valueOf(rs.qj+1);
-            String qk = rs.qk==-1?"":"#"+String.valueOf(rs.qk+1);
+            String qj = rs.qj==null?"":"#"+String.valueOf(rs.qj.id);
+            String qk = rs.qk==null?"":"#"+String.valueOf(rs.qk.id);
             String A = rs.A==-1?"":String.valueOf(rs.A);
             
             reserveTable.addRow(new String[]{
-                id,type,busy,instruction,destination,vj,vk,qj,qk,A
+                id, type, busy, instruction, destination, vj, vk, qj, qk, A
             });
         }
         
         count = 1;
         roTable.setRowCount(0);
-        for (ReorderBuffer ro:reorderBuffer){
-            if (!ro.busy)continue;
+        for (ReorderBuffer ro : reorderBuffer) {
+            if (!ro.isBusy(clock)) {
+                continue;
+            }
             String input = String.valueOf(count++);
-            String busy = ro.busy?"sim":"nao";
+            String busy = ro.isBusy(clock) ? "sim" : "nao";
             String instruction = ro.instruction;
             String state = String.valueOf(ro.state);
-            String destination = ro.destination==-1?"":"R"+ro.destination;
-            String value = ro.value==-1?"":String.valueOf(ro.value);
+            String destination = ro.destination == -1 ? "" : "R" + ro.destination;
+            String value = ro.value == -1 ? "" : String.valueOf(ro.value);
             
             roTable.addRow(new String[]{
-                input,busy,instruction,state,destination,value
+                input, busy, instruction, state, destination, value
             });
         }
         
-        int clock = processor.getClock();
         int instruction = processor.getInstructionCounter();
         int pc = processor.getPc();
         
