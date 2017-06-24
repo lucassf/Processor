@@ -19,6 +19,7 @@ public class Command {
     public int funct;
     public int immediate;
     public int targetAddress;
+    public int pc;
     public CommandType commandType;
     public int T_Dest;     //T_Dest é o registrador de destino no Tomasulo.
 

@@ -12,7 +12,7 @@ package processor;
 class ULA {
 
     public int nonBusyClock = -1;
-    public boolean operating = false;
+    public boolean toWrite = false;
     public int result = -1;// branch: 0 se nao jump, 1 se jump
     public int timeToFinish;
     public int vj = -1;
@@ -31,7 +31,7 @@ class ULA {
         vk = -1; 
         A = -1;
         nonBusyClock = -1;
-        operating = false;
+        toWrite = false;
     }
 
     public void doFPOperation(int clock) {

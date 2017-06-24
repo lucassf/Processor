@@ -1,5 +1,5 @@
 package processor;
 
 public enum State {
-    ISSUE,EXECUTE,WRITE,COMMIT
+    EMPTY,ISSUE,EXECUTE,WRITE,COMMIT
 }

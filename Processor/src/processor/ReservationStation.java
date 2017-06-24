@@ -7,7 +7,7 @@ class ReservationStation {
 
     public String name;
     public String instruction;
-    private int nonBusyClock;
+    public int nonBusyClock;
     public int issuedClock;
     public int clockInserted;
     public Operation op;
@@ -46,7 +46,6 @@ class ReservationStation {
         //encontar um rob nao ocupado
         ReorderBuffer r = proc.getFirstNonBusyRob();
         if (r == null){
-            System.out.println("Tried issue, no ROB available");
             return false;     //nenhum rob disponivel
         }
         
@@ -55,7 +54,6 @@ class ReservationStation {
         issuedClock = clock;
         
         List<Register> regs = proc.getR();
-        ArrayList<ReorderBuffer> rob = proc.getRob();
 
         instruction = command.instruction;
         
@@ -63,9 +61,10 @@ class ReservationStation {
         int rt = command.rt;
         int rs = command.rs;
 
-        r.instruction = command.instruction;
-        r.ready = false;
+        r.readyClock = Integer.MAX_VALUE;
         r.nonBusyClock = Integer.MAX_VALUE;
+        r.co = command;
+        r.station = this;
 
         //instrucao le rs
         //ADD, ADDI, BEQ, BLE, BNE, LW, MUL, SUB, SW
@@ -73,7 +72,7 @@ class ReservationStation {
             //se alguma instrucao grava em rs
             if (regs.get(rs).busy) {
                 ReorderBuffer h = regs.get(rs).qi;
-                if (h.ready) {//inst ja concluida
+                if (h.isReady(clock)) {//inst ja concluida
                     vj = h.value;
                     qj = null;
                 }
@@ -93,7 +92,7 @@ class ReservationStation {
         if (command.isR() || command.op == Operation.BEQ || command.op == Operation.BLE || command.op == Operation.BNE) {
             if (regs.get(rt).busy) {
                 ReorderBuffer h = regs.get(rt).qi;
-                if (h.ready) {//inst ja concluida
+                if (h.isReady(clock)) {//inst ja concluida
                     vk = h.value;
                     qk = null;
                 } else {
@@ -114,12 +113,12 @@ class ReservationStation {
         if (command.commandType == CommandType.R) {
             regs.get(rd).qi = reorder;
             regs.get(rd).busy = true;
-            r.destination = rd;
+            r.destination = regs.get(rd);
         }
         //caso addi rt = rs + imm
         //load r[rt] = MEM[r[rs] + imm]]
         if (command.op == Operation.ADDI || command.op == Operation.LW) {
-            r.destination = rt;
+            r.destination = regs.get(rt);
             //immediate
             vk = command.immediate;
             qk = null;
