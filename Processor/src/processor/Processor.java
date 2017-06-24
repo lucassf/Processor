@@ -21,12 +21,14 @@ public class Processor {
     private final int N_Reservation_Soma = 3;
     private final int N_Reservation_Mult = 2;
     private final int N_Reservation_Mem = 5;
+    private final int N_ReorderBuffer = 10;
 
     private int pc = 0;
     private int clock = 0;
     private int instructionCounter = 0;
     private int prediction = 0;
     private int predictionBalance = 0;
+    private int robId = 0;
 
     //OBS: cuidado se remover algm do rob, vai ter que ajustar indices nos em r[] e nas estacoes
     private final int[] Mem = new int[4096];
@@ -85,11 +87,11 @@ public class Processor {
         for (int i = 0; i < N_Reservation_Mem; i++) {
             reservationStationsMemoria.add(new ReservationStation(this, "Load/Store", i+1));
         }
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < N_ReorderBuffer; i++) {
             rob.add(new ReorderBuffer(i + 1));
         }
         for (int i = 0; i < N_Register; i++) {
-            Register temp = new Register(i + 1);
+            Register temp = new Register(i);
             Reg[i] = temp;
         }
 
@@ -389,11 +391,14 @@ public class Processor {
     }
 
     public ReorderBuffer getFirstNonBusyRob() {
-        for (ReorderBuffer r : rob) {
-            if (!r.isBusy(clock)) {
-                return r;
-            }
+        if (filaRob.size() > N_ReorderBuffer){
+            return null;
         }
-        return null;
+        ReorderBuffer r = rob.get(robId);
+        robId++;
+        if (robId >= N_ReorderBuffer) {
+            robId = 0;
+        }
+        return r;
     }
 }

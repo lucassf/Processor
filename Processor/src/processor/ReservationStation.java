@@ -65,6 +65,7 @@ class ReservationStation {
         r.nonBusyClock = Integer.MAX_VALUE;
         r.co = command;
         r.station = this;
+        r.state = State.ISSUE;
 
         //instrucao le rs
         //ADD, ADDI, BEQ, BLE, BNE, LW, MUL, SUB, SW

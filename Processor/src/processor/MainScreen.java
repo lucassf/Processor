@@ -59,7 +59,7 @@ public class MainScreen extends javax.swing.JFrame {
         count = 1;
         roTable.setRowCount(0);
         for (ReorderBuffer ro : reorderBuffer) {
-            if (!ro.isBusy(clock)) {
+            if (ro.state == State.EMPTY) {
                 continue;
             }
             String input = String.valueOf(count++);
