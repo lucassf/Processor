@@ -9,9 +9,11 @@ import javax.swing.table.DefaultTableModel;
 public class MainScreen extends javax.swing.JFrame {
     
     private Processor processor;
+    private boolean execute;
     
     public MainScreen() {
         initComponents();
+        execute = false;
     }
 
     private void updateTable(){
@@ -58,16 +60,22 @@ public class MainScreen extends javax.swing.JFrame {
         
         count = 1;
         roTable.setRowCount(0);
-        for (ReorderBuffer ro : reorderBuffer) {
-            if (ro.state == State.EMPTY) {
+        for (ReorderBuffer rob : reorderBuffer) {
+            if (rob.state == State.EMPTY) {
                 continue;
             }
             String input = String.valueOf(count++);
-            String busy = ro.isBusy(clock) ? "sim" : "nao";
-            String instruction = ro.co.instruction;
-            String state = String.valueOf(ro.state);
-            String destination = ro.destination == null ? "" : "Reg[" + ro.destination.id + "]";
-            String value = ro.value == -1 ? "" : String.valueOf(ro.value);
+            String busy = rob.isBusy(clock) ? "sim" : "nao";
+            String instruction = rob.co.instruction;
+            String state = String.valueOf(rob.state);
+            String destination = rob.destination == null ? "" : "Reg[" + rob.destination.id + "]";
+            
+            ReservationStation res = rob.station;
+            if (res.op == Operation.SW){
+                destination = "Mem[" +res.A+ " + R[" +res.qj.id+ "]]";
+            }
+            
+            String value = rob.value == -1 ? "" : String.valueOf(rob.value);
             
             roTable.addRow(new String[]{
                 input, busy, instruction, state, destination, value
@@ -137,6 +145,8 @@ public class MainScreen extends javax.swing.JFrame {
         pcLabel = new javax.swing.JLabel();
         clockLabel = new javax.swing.JLabel();
         clearButton = new javax.swing.JToggleButton();
+        autoButton = new javax.swing.JButton();
+        pauseButton = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setResizable(false);
@@ -277,6 +287,22 @@ public class MainScreen extends javax.swing.JFrame {
             }
         });
 
+        autoButton.setText("Exec. auto");
+        autoButton.setEnabled(false);
+        autoButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                autoButtonActionPerformed(evt);
+            }
+        });
+
+        pauseButton.setText("Parar");
+        pauseButton.setEnabled(false);
+        pauseButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                pauseButtonActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -284,17 +310,24 @@ public class MainScreen extends javax.swing.JFrame {
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap(37, Short.MAX_VALUE)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(layout.createSequentialGroup()
-                        .addComponent(startButton)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(nextButton)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(clearButton))
                     .addComponent(jLabel1)
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                            .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 653, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(label1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addGroup(layout.createSequentialGroup()
-                                .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                                    .addGroup(layout.createSequentialGroup()
+                                        .addComponent(startButton)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(nextButton)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(clearButton)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(autoButton)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(pauseButton))
+                                    .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                                     .addComponent(jLabel2)
@@ -306,9 +339,7 @@ public class MainScreen extends javax.swing.JFrame {
                                     .addComponent(instructionsLabel)
                                     .addComponent(pcLabel)
                                     .addComponent(clockLabel)
-                                    .addComponent(cpiLabel)))
-                            .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 653, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(label1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                    .addComponent(cpiLabel))))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(label2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -324,7 +355,9 @@ public class MainScreen extends javax.swing.JFrame {
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(startButton)
                             .addComponent(nextButton)
-                            .addComponent(clearButton))
+                            .addComponent(clearButton)
+                            .addComponent(autoButton)
+                            .addComponent(pauseButton))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addComponent(jLabel1))
                     .addComponent(label2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -366,6 +399,7 @@ public class MainScreen extends javax.swing.JFrame {
         startButton.setEnabled(false);
         nextButton.setEnabled(true);
         clearButton.setEnabled(true);
+        autoButton.setEnabled(true);
         clockLabel.setText("0");
         pcLabel.setText("0");
         instructionsLabel.setText("0");
@@ -382,7 +416,27 @@ public class MainScreen extends javax.swing.JFrame {
         startButton.setEnabled(true);
         nextButton.setEnabled(false);
         clearButton.setEnabled(false);
+        autoButton.setEnabled(false);
     }//GEN-LAST:event_clearButtonActionPerformed
+
+    private void autoButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_autoButtonActionPerformed
+        nextButton.setEnabled(false);
+        clearButton.setEnabled(false);
+        autoButton.setEnabled(false);
+        pauseButton.setEnabled(true);
+        
+        execute = true;
+        while (execute){
+            processor.nextClock();
+            updateTable();
+        }
+        startButton.setEnabled(true);
+    }//GEN-LAST:event_autoButtonActionPerformed
+
+    private void pauseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_pauseButtonActionPerformed
+        pauseButton.setEnabled(false);
+        execute = false;
+    }//GEN-LAST:event_pauseButtonActionPerformed
 
     
     public static void main(String args[]) {
@@ -416,6 +470,7 @@ public class MainScreen extends javax.swing.JFrame {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JTable ReorderBufferTable;
     private javax.swing.JTable ReservationTable;
+    private javax.swing.JButton autoButton;
     private javax.swing.JToggleButton clearButton;
     private javax.swing.JLabel clockLabel;
     private javax.swing.JLabel cpiLabel;
@@ -431,6 +486,7 @@ public class MainScreen extends javax.swing.JFrame {
     private java.awt.Label label1;
     private java.awt.Label label2;
     private javax.swing.JButton nextButton;
+    private javax.swing.JButton pauseButton;
     private javax.swing.JLabel pcLabel;
     private javax.swing.JTable registerTable;
     private javax.swing.JButton startButton;
