@@ -105,6 +105,12 @@ public class Processor {
             return false;
         }
         Command co = commands.get(pc / 4);
+        
+        if (co.isJ()){
+            pc = co.immediate;
+            log(co, "Jumped to pc = " + pc);
+            return true;
+        }
 
         ArrayList<ReservationStation> rs;           //encontrar a estacao de reserva correspondente
         if (co.isEstacaoMem()) {
@@ -223,7 +229,6 @@ public class Processor {
             chosen.reorder.state = State.EXECUTE;
             chosen.etapaLoad++;
             ula.nonBusyClock = clock + 1;
-            log(chosen.reorder.co, "finished execute LW step 1");
         }
         else if (chosen.op == Operation.LW && chosen.etapaLoad == 2) {
             //Le Mem[chosen.A]
@@ -233,7 +238,6 @@ public class Processor {
             ula.op = Operation.LW;
             ula.station = chosen;
             ula.nonBusyClock = clock + ula.timeToFinish - 1;
-            log(chosen.reorder.co, "finished execute LW step 2");
         }
         else if (chosen.op == Operation.SW) {
             chosen.reorder.address = chosen.vj + chosen.A;
@@ -243,9 +247,8 @@ public class Processor {
             chosen.reorder.value = chosen.vk;
             chosen.nonBusyClock = clock + 1;
             ula.nonBusyClock = clock + ula.timeToFinish;
-            log(chosen.reorder.co, "finished execute SW");
         }
-        log(chosen.reorder.co, "started operation, to be finished in clock " + (ula.nonBusyClock - 1));
+        log(chosen.reorder.co, "started " + chosen.op.toString() + " operation, to be finished in clock " + (ula.nonBusyClock - 1));
         
         return true;
     }
@@ -359,7 +362,14 @@ public class Processor {
         //Libera o Rob
         h.state = State.COMMIT;
         h.nonBusyClock = clock + 1;
-        log(h.co, "commited");
+        log(h.co, "commited, " + (N_ReorderBuffer - filaRob.size()) + " free Robs");
+        if (N_ReorderBuffer == filaRob.size()){
+            System.out.println("Error:");
+            for(int i=0; i<N_ReorderBuffer; i++){
+                System.out.println(i + "=i: " + filaRob.peek().co.instruction);
+                filaRob.add(filaRob.poll());
+            }
+        }
         
         //Altera o PC se for branch
         //BEQ, BLQ, BNE
@@ -442,7 +452,7 @@ public class Processor {
     }
 
     public ReorderBuffer getFirstNonBusyRob() {
-        if (filaRob.size() > N_ReorderBuffer){
+        if (filaRob.size() >= N_ReorderBuffer){
             return null;
         }
         ReorderBuffer r = rob.get(robId);

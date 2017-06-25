@@ -89,8 +89,8 @@ class ReservationStation {
         }
 
         //se alguma instrucao le rt
-        //ADD, BEQ, BLE, BNE, MUL, SUB
-        if (command.isR() || command.op == Operation.BEQ || command.op == Operation.BLE || command.op == Operation.BNE) {
+        //ADD, BEQ, BLE, BNE, MUL, SUB, SW
+        if (command.isR() || command.op == Operation.BEQ || command.op == Operation.BLE || command.op == Operation.BNE || command.op == Operation.SW) {
             if (regs.get(rt).busy) {
                 ReorderBuffer h = regs.get(rt).qi;
                 if (h.isReady(clock)) {//inst ja concluida
