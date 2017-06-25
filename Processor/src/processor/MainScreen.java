@@ -426,10 +426,10 @@ public class MainScreen extends javax.swing.JFrame {
         pauseButton.setEnabled(true);
         
         execute = true;
-        while (execute){
+        for(int c=0; c<500; c++){
             processor.nextClock();
-            updateTable();
         }
+        updateTable();
         startButton.setEnabled(true);
     }//GEN-LAST:event_autoButtonActionPerformed
 

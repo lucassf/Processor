@@ -65,7 +65,7 @@ public class Processor {
 
     private void readFile() {
         Command.setMap();
-        String filename = "program.txt";
+        String filename = "program1.txt";
         try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
             String line;
             while ((line = br.readLine()) != null) {
@@ -107,7 +107,7 @@ public class Processor {
         Command co = commands.get(pc / 4);
         
         if (co.isJ()){
-            pc = co.immediate;
+            pc = co.targetAddress;
             log(co, "Jumped to pc = " + pc);
             return true;
         }
