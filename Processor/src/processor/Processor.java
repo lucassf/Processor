@@ -23,12 +23,12 @@ public class Processor {
     private final int N_Reservation_Mult = 2;
     private final int N_Reservation_Mem = 5;
     private final int N_ReorderBuffer = 10;
-    private final int N_ErrorLimit = 1;
+    private final int N_ErrorLimit = 0;
 
     public int pc = 0;
     private int clock = 0;
     private int instructionCounter = 0;
-    private int prediction = 1;
+    private int prediction;
     private int consecutiveErrors = 0;
     private int robId = 0;
     private boolean debug = true;
@@ -45,6 +45,8 @@ public class Processor {
     private final ArrayList<ReservationStation> reservationStationsMultiplicacao = new ArrayList<>();
     private final ArrayList<ReservationStation> reservationStationsMemoria = new ArrayList<>();
     private final Queue<ReorderBuffer> filaRob = new ConcurrentLinkedQueue<>();
+    private ArrayList<Preditor> preditores = new ArrayList<>();
+    private PreditorFactory factory = new PreditorFactory();
     
     public Processor() {
         initEstacoesReservaERobERegister();
@@ -109,7 +111,6 @@ public class Processor {
             return false;
         }
         Command co = commands.get(pc / 4);
-        
         if (co.isJ()){
             pc = co.targetAddress;
             log(co, "Jumped to pc = " + pc);
@@ -127,6 +128,7 @@ public class Processor {
         
         boolean hasIssued = false;
         boolean availResStat = false;
+        ReorderBuffer buff = null;
         ReservationStation re = null;
         for (int r = 0; r < rs.size(); r++) {
             if (!rs.get(r).isBusy(clock)) {
@@ -135,6 +137,7 @@ public class Processor {
                     hasIssued = true;
                     filaRob.add(rs.get(r).reorder);
                     re = rs.get(r);
+                    buff = rs.get(r).reorder;
                     log(co, co.op.toString() + " issued to Rob " + rs.get(r).reorder.id + " and ResStat " + re.id);
                 }
                 else{
@@ -151,12 +154,26 @@ public class Processor {
                 if (co.op != Operation.BEQ && co.op != Operation.BLE && co.op != Operation.BNE){
                     pc = pc + 4;
                 }
-                else if (prediction == 1){
-                    pc = re.A;
-                }
                 else{
-                    pc = pc + 4;
+                    //FAZER PREDIÇÃO
+                    boolean achou = false;
+                    for (Preditor p : preditores) {
+                        if (p.pc == co.pc) {
+                            achou = true;
+                            buff.preditor = p;
+                        }
+                    }
+                    if (!achou)
+                        buff.preditor = factory.createPreditor(N_ErrorLimit,co.pc); 
+                    buff.newPreditor = !achou;
+                    if (buff.preditor.predict() == 1) {
+
+                        pc = re.A;
+                    } else {
+                        pc = pc + 4;
+                    }
                 }
+                
             }
         }
 
@@ -380,6 +397,11 @@ public class Processor {
         //Altera o PC se for branch
         //BEQ, BLQ, BNE
         if (h.co.op == Operation.BEQ || h.co.op == Operation.BLE || h.co.op == Operation.BNE){
+            prediction = h.preditor.predict();
+            h.preditor.update(h.value);    
+            if(h.newPreditor)
+                preditores.add(h.preditor);
+         //   System.out.println(preditores.size());
             if (prediction !=  h.value){    //mispredicted
                 if (h.value == 1){
                     pc = h.address;
@@ -387,13 +409,14 @@ public class Processor {
                 else{
                     pc = h.co.pc + 4;
                 }
+                /*
                 consecutiveErrors++;
                 log(h.co, "prediction failed, Robs cleared, pc now at " + pc);
                 if (consecutiveErrors > N_ErrorLimit){
                     consecutiveErrors = 0;
                     prediction = 1 - prediction;
                     log(h.co, "prediction satte switched to " + prediction);
-                }
+                }*/
                 clearMistake();
             }
             else {

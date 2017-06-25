@@ -60,7 +60,6 @@ class ReservationStation {
         int rd = command.rd;
         int rt = command.rt;
         int rs = command.rs;
-
         r.readyClock = Integer.MAX_VALUE;
         r.nonBusyClock = Integer.MAX_VALUE;
         r.co = command;

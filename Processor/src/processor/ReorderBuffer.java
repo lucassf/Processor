@@ -10,7 +10,8 @@ class ReorderBuffer {
     public Register destination = null;
     public ReservationStation station = null;
     public Command co;
-    
+    public Preditor preditor;
+    public boolean newPreditor;
     public int value;
     public int address; //usado nos branches e store
     public int id;
@@ -37,5 +38,6 @@ class ReorderBuffer {
         value = -1;
         destination = null;
         station = null;
+        preditor = null;
     }
 }
