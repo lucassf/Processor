@@ -24,12 +24,14 @@ public class Processor {
     private final int N_Reservation_Mem = 5;
     private final int N_ReorderBuffer = 10;
 
-    private int pc = 0;
+    public int pc = 0;
     private int clock = 0;
     private int instructionCounter = 0;
     private int prediction = 0;
     private int predictionBalance = 0;
     private int robId = 0;
+    
+    public int N_Instructions = 0;
 
     //OBS: cuidado se remover algm do rob, vai ter que ajustar indices nos em r[] e nas estacoes
     private final int[] Mem = new int[4096];
@@ -70,10 +72,13 @@ public class Processor {
             String line;
             while ((line = br.readLine()) != null) {
                 commands.add(Command.parseCommand(line.split(";")[0], line.split(";")[1]));
+                N_Instructions++;
             }
             for(int i = 0; i < commands.size(); i++){
                 commands.get(i).pc = 4*i;
             }
+            
+            
         } catch (IOException e) {
             System.out.println("Erro na leitura");
         }
