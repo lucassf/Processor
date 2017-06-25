@@ -16,7 +16,6 @@ public class Preditor2bits extends Preditor{
     }
     @Override
     public int predict(){
-        System.out.println(state);
         if (this.state == 3 || this.state == 2){            
             //System.out.println("predict jump");
             return 1;

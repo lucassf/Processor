@@ -23,7 +23,7 @@ public class Processor {
     private final int N_Reservation_Mult = 2;
     private final int N_Reservation_Mem = 5;
     private final int N_ReorderBuffer = 10;
-    private final int N_ErrorLimit = 0;
+    private final int N_ErrorLimit = 2;
 
     public int pc = 0;
     private int clock = 0;
