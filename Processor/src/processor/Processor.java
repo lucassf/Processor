@@ -25,7 +25,7 @@ public class Processor {
     private final int N_ReorderBuffer = 10;
     private final int N_ErrorLimit = 1;
 
-    private int pc = 0;
+    public int pc = 0;
     private int clock = 0;
     private int instructionCounter = 0;
     private int prediction = 1;
@@ -77,6 +77,8 @@ public class Processor {
             for(int i = 0; i < commands.size(); i++){
                 commands.get(i).pc = 4*i;
             }
+            
+            
         } catch (IOException e) {
             System.out.println("Erro na leitura");
         }
