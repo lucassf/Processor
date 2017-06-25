@@ -124,8 +124,8 @@ class ReservationStation {
             vk = command.immediate;
             qk = null;
             //rt
-            regs.get(command.rt).qi = reorder;
-            regs.get(command.rt).busy = true;
+            regs.get(rt).qi = reorder;
+            regs.get(rt).busy = true;
         }
         
         //se a instrução precisa de endereço

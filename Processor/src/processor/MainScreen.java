@@ -9,11 +9,10 @@ import javax.swing.table.DefaultTableModel;
 public class MainScreen extends javax.swing.JFrame {
     
     private Processor processor;
-    private boolean execute;
+    private int MAX_CLOCK = 10000;
     
     public MainScreen() {
         initComponents();
-        execute = false;
     }
 
     private void updateTable(){
@@ -46,7 +45,7 @@ public class MainScreen extends javax.swing.JFrame {
             String type = rs.name;
             String busy = rs.isBusy(clock)?"Sim":"Nao";
             String instruction = rs.instruction;
-            String destination = rs.reorder==null?"":"#"+String.valueOf(rs.id);
+            String destination = rs.reorder==null?"":"#"+String.valueOf(rs.reorder.id);
             String vj = rs.vj==-1?"":String.valueOf(rs.vj);
             String vk = rs.vk==-1?"":String.valueOf(rs.vk);
             String qj = rs.qj==null?"":"#"+String.valueOf(rs.qj.id);
@@ -407,7 +406,7 @@ public class MainScreen extends javax.swing.JFrame {
     }//GEN-LAST:event_startButtonActionPerformed
 
     private void nextButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nextButtonActionPerformed
-        processor.nextClock();
+        processor.nextClock(true);
         updateTable();
     }//GEN-LAST:event_nextButtonActionPerformed
 
@@ -425,17 +424,17 @@ public class MainScreen extends javax.swing.JFrame {
         autoButton.setEnabled(false);
         pauseButton.setEnabled(true);
         
-        execute = true;
-        for(int c=0; c<500; c++){
-            processor.nextClock();
+        int clk = 0;
+        while(processor.nextClock(false) && clk < MAX_CLOCK){
+            clk++;
         }
+        
         updateTable();
         startButton.setEnabled(true);
     }//GEN-LAST:event_autoButtonActionPerformed
 
     private void pauseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_pauseButtonActionPerformed
         pauseButton.setEnabled(false);
-        execute = false;
     }//GEN-LAST:event_pauseButtonActionPerformed
 
     

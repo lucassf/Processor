@@ -23,13 +23,15 @@ public class Processor {
     private final int N_Reservation_Mult = 2;
     private final int N_Reservation_Mem = 5;
     private final int N_ReorderBuffer = 10;
+    private final int N_ErrorLimit = 1;
 
     private int pc = 0;
     private int clock = 0;
     private int instructionCounter = 0;
-    private int prediction = 0;
-    private int predictionBalance = 0;
+    private int prediction = 1;
+    private int consecutiveErrors = 0;
     private int robId = 0;
+    private boolean debug = true;
 
     //OBS: cuidado se remover algm do rob, vai ter que ajustar indices nos em r[] e nas estacoes
     private final int[] Mem = new int[4096];
@@ -50,22 +52,23 @@ public class Processor {
     }
 
     public void log(Command co, String message) {
-        System.out.println("Clock " + clock + ", Instruction " + co.instruction + ": " + message);
+        if (debug) System.out.println("Clock " + clock + ", Instruction " + co.instruction + ": " + message);
     }
     
-    public boolean nextClock() {
+    public boolean nextClock(boolean debug) {
+        this.debug = debug;
         boolean ret = false;
-        ret = issue() && ret;
-        ret = execute() && ret;
-        ret = write() && ret;
-        ret = commit() && ret;
+        ret = issue() || ret;
+        ret = execute() || ret;
+        ret = write() || ret;
+        ret = commit() || ret;
         clock++;
         return ret;
     }
 
     private void readFile() {
         Command.setMap();
-        String filename = "program1.txt";
+        String filename = "program.txt";
         try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
             String line;
             while ((line = br.readLine()) != null) {
@@ -96,7 +99,6 @@ public class Processor {
             Register temp = new Register(i);
             Reg[i] = temp;
         }
-
     }
 
     public boolean issue() {
@@ -216,7 +218,8 @@ public class Processor {
                     re.op != Operation.EMPTY && clock > re.issuedClock &&
                     (chosen == null || chosen.issuedClock > re.issuedClock) &&
                     ((re.op == Operation.SW && re.reorder == filaRob.peek())
-                    || re.etapaLoad == 1 || (re.etapaLoad == 2 && !hasRobWithAddress(re.reorder)))) {
+                    || (re.etapaLoad == 1 && !hasLoadBefore(re.reorder))
+                    || (re.etapaLoad == 2 && !hasRobWithAddress(re.reorder)))) {
                 chosen = re;
             }
         }
@@ -243,9 +246,10 @@ public class Processor {
             chosen.reorder.address = chosen.vj + chosen.A;
             //Escreve Mem[chosen.A]
             chosen.reorder.state = State.EXECUTE;
-            chosen.reorder.readyClock = clock + 1;
+            chosen.reorder.readyClock = clock + ula.timeToFinish;
             chosen.reorder.value = chosen.vk;
-            chosen.nonBusyClock = clock + 1;
+            chosen.nonBusyClock = -1;
+            chosen.op = Operation.EMPTY;
             ula.nonBusyClock = clock + ula.timeToFinish;
         }
         log(chosen.reorder.co, "started " + chosen.op.toString() + " operation, to be finished in clock " + (ula.nonBusyClock - 1));
@@ -255,9 +259,9 @@ public class Processor {
     
     public boolean execute() {
         boolean ret = false;
-        ret = executeUlaAddMul(ulaAdd) && ret;
-        ret = executeUlaAddMul(ulaMult) && ret;
-        ret = executeUlaMem(ulaMem) && ret;
+        ret = executeUlaAddMul(ulaAdd) || ret;
+        ret = executeUlaAddMul(ulaMult) || ret;
+        ret = executeUlaMem(ulaMem) || ret;
         return ret;
     }
 
@@ -381,10 +385,17 @@ public class Processor {
                 else{
                     pc = h.co.pc + 4;
                 }
-                log(h.co, "prediction failed, Robs cleared, pc now at " + pc + "(" + commands.get(pc/4).instruction + ")");
+                consecutiveErrors++;
+                log(h.co, "prediction failed, Robs cleared, pc now at " + pc);
+                if (consecutiveErrors > N_ErrorLimit){
+                    consecutiveErrors = 0;
+                    prediction = 1 - prediction;
+                    log(h.co, "prediction satte switched to " + prediction);
+                }
                 clearMistake();
             }
             else {
+                consecutiveErrors = 0;
                 log(h.co, "prediction succedded");
             }
         }
@@ -414,6 +425,15 @@ public class Processor {
         Queue<ReorderBuffer> fila = new LinkedList<>(filaRob);
         while(fila.peek() != cur){
             if (fila.peek().address == cur.address) return true;
+            fila.poll();
+        }
+        return false;
+    }
+    
+    private boolean hasLoadBefore(ReorderBuffer cur) {
+        Queue<ReorderBuffer> fila = new LinkedList<>(filaRob);
+        while(fila.peek() != cur){
+            if (fila.peek().co.op == Operation.LW) return true;
             fila.poll();
         }
         return false;
