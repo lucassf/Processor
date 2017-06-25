@@ -42,8 +42,6 @@
                                       <Component id="clearButton" min="-2" max="-2" attributes="0"/>
                                       <EmptySpace max="32767" attributes="0"/>
                                       <Component id="autoButton" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                      <Component id="pauseButton" min="-2" max="-2" attributes="0"/>
                                   </Group>
                                   <Component id="jScrollPane4" min="-2" max="-2" attributes="0"/>
                               </Group>
@@ -85,7 +83,6 @@
                           <Component id="nextButton" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="clearButton" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="autoButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="pauseButton" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace type="unrelated" max="-2" attributes="0"/>
                       <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
@@ -524,15 +521,6 @@
       </Properties>
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="autoButtonActionPerformed"/>
-      </Events>
-    </Component>
-    <Component class="javax.swing.JButton" name="pauseButton">
-      <Properties>
-        <Property name="text" type="java.lang.String" value="Parar"/>
-        <Property name="enabled" type="boolean" value="false"/>
-      </Properties>
-      <Events>
-        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="pauseButtonActionPerformed"/>
       </Events>
     </Component>
   </SubComponents>

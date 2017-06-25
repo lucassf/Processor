@@ -1,475 +1,514 @@
 package processor;
 
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.AbstractQueue;
 import java.util.ArrayList;
+import java.util.Vector;
+import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
-import javax.swing.table.DefaultTableModel;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class MainScreen extends javax.swing.JFrame {
+
+
+    //TO DO: AJEITAR ISSUE (vk: valor, vj: end, A; imm)
+
+public class Processor {
+
+    private final int N_Register = 32;
+    private final int N_Reservation_Soma = 3;
+    private final int N_Reservation_Mult = 2;
+    private final int N_Reservation_Mem = 5;
+    private final int N_ReorderBuffer = 10;
+    private final int N_ErrorLimit = 2;
+
+    public int pc = 0;
+    private int clock = 0;
+    private int instructionCounter = 0;
+    private int prediction;
+    private int consecutiveErrors = 0;
+    private int robId = 0;
+    private boolean debug = true;
+
+    //OBS: cuidado se remover algm do rob, vai ter que ajustar indices nos em r[] e nas estacoes
+    private final int[] Mem = new int[4096];
+    private final Register[] Reg = new Register[N_Register];
+    private final Vector<Command> commands = new Vector();
+    private final ULA ulaAdd = new ULA(1);
+    private final ULA ulaMult = new ULA(3);
+    private final ULA ulaMem = new ULA(4);
+    private final ArrayList<ReorderBuffer> rob = new ArrayList<>();
+    private final ArrayList<ReservationStation> reservationStationsSoma = new ArrayList<>();
+    private final ArrayList<ReservationStation> reservationStationsMultiplicacao = new ArrayList<>();
+    private final ArrayList<ReservationStation> reservationStationsMemoria = new ArrayList<>();
+    private final Queue<ReorderBuffer> filaRob = new ConcurrentLinkedQueue<>();
+    private ArrayList<Preditor> preditores = new ArrayList<>();
+    private PreditorFactory factory = new PreditorFactory();
     
-    private Processor processor;
-    private int MAX_CLOCK = 10000;
-    
-    public MainScreen() {
-        initComponents();
+    public Processor() {
+        initEstacoesReservaERobERegister();
+        readFile();
     }
 
-    private void updateTable(){
-        List<Register> registerStatus = processor.getR();
-        List<ReorderBuffer> reorderBuffer = processor.getRob();
-        List<ReservationStation> reservationStation = new ArrayList<>();
-        reservationStation.addAll(processor.getReservationStationsMemoria());
-        reservationStation.addAll(processor.getReservationStationsSoma());
-        reservationStation.addAll(processor.getReservationStationsMultiplicacao());
-        
-        DefaultTableModel regTable = (DefaultTableModel)registerTable.getModel();
-        DefaultTableModel roTable = (DefaultTableModel)ReorderBufferTable.getModel();
-        DefaultTableModel reserveTable = (DefaultTableModel)ReservationTable.getModel();
-        int count = 0;
-        
-        for(Register rs: registerStatus){
-            String qi = rs.busy?String.valueOf(rs.qi.id):"";
-            String vi = rs.value==-1?"?":String.valueOf(rs.value);
-            regTable.setValueAt(qi, count%8, 1+3*(count/8));
-            regTable.setValueAt(vi, count%8, 2+3*(count/8));
-            count++;
-        }
-        
-        int clock = processor.getClock();
-        
-        count = 1;
-        reserveTable.setRowCount(0);
-        for (ReservationStation rs: reservationStation){
-            String id = "ER"+count++;
-            String type = rs.name;
-            String busy = rs.isBusy(clock)?"Sim":"Nao";
-            String instruction = rs.instruction;
-            String destination = rs.reorder==null?"":"#"+String.valueOf(rs.reorder.id);
-            String vj = rs.vj==-1?"":String.valueOf(rs.vj);
-            String vk = rs.vk==-1?"":String.valueOf(rs.vk);
-            String qj = rs.qj==null?"":"#"+String.valueOf(rs.qj.id);
-            String qk = rs.qk==null?"":"#"+String.valueOf(rs.qk.id);
-            String A = rs.A==-1?"":String.valueOf(rs.A);
-            
-            reserveTable.addRow(new String[]{
-                id, type, busy, instruction, destination, vj, vk, qj, qk, A
-            });
-        }
-        
-        count = 1;
-        roTable.setRowCount(0);
-        for (ReorderBuffer rob : reorderBuffer) {
-            if (rob.state == State.EMPTY) {
-                continue;
-            }
-            String input = String.valueOf(count++);
-            String busy = rob.isBusy(clock) ? "sim" : "nao";
-            String instruction = rob.co.instruction;
-            String state = String.valueOf(rob.state);
-            String destination = rob.destination == null ? "" : "Reg[" + rob.destination.id + "]";
-            
-            ReservationStation res = rob.station;
-            if (res.op == Operation.SW){
-                destination = "Mem[" +res.A+ " + R[" + rob.co.rs + "]]";
-            }
-            
-            String value = rob.value == -1 ? "" : String.valueOf(rob.value);
-            
-            roTable.addRow(new String[]{
-                input, busy, instruction, state, destination, value
-            });
-        }
-        
-        int instruction = processor.getInstructionCounter();
-        int pc = processor.getPc();
-        
-        NumberFormat formatter = new DecimalFormat("#0.000");
-        String CPI = instruction==0?"0":String.valueOf(formatter.format((double)clock/instruction));
-        
-        clockLabel.setText(String.valueOf(clock));
-        pcLabel.setText(String.valueOf(pc));
-        instructionsLabel.setText(String.valueOf(instruction));
-        cpiLabel.setText(CPI);
+    public void log(Command co, String message) {
+        if (debug) System.out.println("Clock " + clock + ", Instruction " + co.instruction + ": " + message);
     }
     
-    void clearTables(){
-        DefaultTableModel regTable = (DefaultTableModel)registerTable.getModel();
-        DefaultTableModel roTable = (DefaultTableModel)ReorderBufferTable.getModel();
-        DefaultTableModel reserveTable = (DefaultTableModel)ReservationTable.getModel();
-        
-        roTable.setRowCount(0);
-        
-        for(int i=0;i<32;i++){
-            regTable.setValueAt("", i%8, 1+3*(i/8));
-            regTable.setValueAt("", i%8, 2+3*(i/8));
+    public boolean nextClock(boolean debug) {
+        this.debug = debug;
+        boolean ret = false;
+        ret = issue() || ret;
+        ret = execute() || ret;
+        ret = write() || ret;
+        ret = commit() || ret;
+        clock++;
+        return ret;
+    }
+
+    private void readFile() {
+        Command.setMap();
+        String filename = "program.txt";
+        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                commands.add(Command.parseCommand(line.split(";")[0], line.split(";")[1]));
+            }
+            for(int i = 0; i < commands.size(); i++){
+                commands.get(i).pc = 4*i;
+            }
+            
+            
+        } catch (IOException e) {
+            System.out.println("Erro na leitura");
         }
-        reserveTable.setNumRows(0);
+    }
+
+    private void initEstacoesReservaERobERegister() {
+        for (int i = 0; i < N_Reservation_Soma; i++) {
+            reservationStationsSoma.add(new ReservationStation(this, "Add", i+1));
+        }
+        for (int i = 0; i < N_Reservation_Mult; i++) {
+            reservationStationsMultiplicacao.add(new ReservationStation(this, "Mult", i+1));
+        }
+        for (int i = 0; i < N_Reservation_Mem; i++) {
+            reservationStationsMemoria.add(new ReservationStation(this, "Load/Store", i+1));
+        }
+        for (int i = 0; i < N_ReorderBuffer; i++) {
+            rob.add(new ReorderBuffer(i + 1));
+        }
+        for (int i = 0; i < N_Register; i++) {
+            Register temp = new Register(i);
+            Reg[i] = temp;
+        }
+    }
+
+    public boolean issue() {
         
-        for (int i=0;i<5;i++){
-            reserveTable.addRow(new String[]{"ER"+String.valueOf(i+1),"Load/Store"});
-        }for (int i=5;i<8;i++){
-            reserveTable.addRow(new String[]{"ER"+String.valueOf(i+1),"Add"});
-        }for (int i=8;i<10;i++){
-            reserveTable.addRow(new String[]{"ER"+String.valueOf(i+1),"Mult"});
+        if (pc / 4 >= commands.size()) {
+            return false;
+        }
+        Command co = commands.get(pc / 4);
+        if (co.op==Operation.NOP){
+            pc = pc+4;
+            return true;
+        }
+        if (co.isJ()){
+            pc = co.targetAddress;
+            log(co, "Jumped to pc = " + pc);
+            return true;
+        }
+
+        ArrayList<ReservationStation> rs;           //encontrar a estacao de reserva correspondente
+        if (co.isEstacaoMem()) {
+            rs = reservationStationsMemoria;
+        } else if (co.isEstacaoMult()) {
+            rs = reservationStationsMultiplicacao;
+        } else {
+            rs = reservationStationsSoma;
         }
         
-        clockLabel.setText("?");
-        cpiLabel.setText("?");
-        pcLabel.setText("?");
-        instructionsLabel.setText("?");
+        boolean hasIssued = false;
+        boolean availResStat = false;
+        ReorderBuffer buff = null;
+        ReservationStation re = null;
+        for (int r = 0; r < rs.size(); r++) {
+            if (!rs.get(r).isBusy(clock)) {
+                availResStat = true;
+                if(rs.get(r).inserirComando(co, clock)){
+                    hasIssued = true;
+                    filaRob.add(rs.get(r).reorder);
+                    re = rs.get(r);
+                    buff = rs.get(r).reorder;
+                    log(co, co.op.toString() + " issued to Rob " + rs.get(r).reorder.id + " and ResStat " + re.id);
+                }
+                else{
+                    log(co, "No Rob available, issue stalled");
+                }
+                break;
+            }
+        }
+       
+        if (hasIssued) {
+            if (co.isR()) pc = pc + 4;
+            else if (co.isJ()) pc = co.immediate;
+            else{
+                if (co.op != Operation.BEQ && co.op != Operation.BLE && co.op != Operation.BNE){
+                    pc = pc + 4;
+                }
+                else{
+                    //FAZER PREDIÇÃO
+                    boolean achou = false;
+                    for (Preditor p : preditores) {
+                        if (p.pc == co.pc) {
+                            achou = true;
+                            buff.preditor = p;
+                        }
+                    }
+                    if (!achou)
+                        buff.preditor = factory.createPreditor(N_ErrorLimit,co.pc); 
+                    buff.newPreditor = !achou;
+                    if (buff.preditor.predict() == 1) {
+
+                        pc = re.A;
+                    } else {
+                        pc = pc + 4;
+                    }
+                }
+                
+            }
+        }
+
+        if (!availResStat) {
+            log(co, "No ResStat available, issue stalled");
+        }
+        
+        return true;
+    }
+
+    public boolean executeUlaAddMul(ULA ula){
+        if (ula.toWrite || ula.isBusy(clock)) {
+            return true;
+        }
+        
+        //procurar alguém pra executar
+        ArrayList<ReservationStation> rList = null;
+        if (ula == ulaAdd) {
+            rList = reservationStationsSoma;
+        }
+        if (ula == ulaMult) {
+            rList = reservationStationsMultiplicacao;
+        }
+        ReservationStation chosen = null;
+        for (int i = 0; i < rList.size(); i++) {
+            ReservationStation re = rList.get(i);
+            if (re.qj == null && re.qk == null &&
+                    re.op != Operation.EMPTY && clock > re.issuedClock &&
+                    (chosen == null || chosen.issuedClock > re.issuedClock)) {
+                chosen = re;
+            }
+        }
+        if (chosen == null){
+            return false;     //nenhuma ResStat pra operar
+        }
+        ula.vj = chosen.vj;
+        ula.vk = chosen.vk;
+        ula.op = chosen.op;
+        ula.A = chosen.A;
+        chosen.reorder.state = State.EXECUTE;
+        ula.station = chosen;
+        ula.nonBusyClock = clock + ula.timeToFinish;
+        ula.doFPOperation(clock);
+        ula.toWrite = true;
+        log(chosen.reorder.co, "started operation, to be finished in clock " + (ula.nonBusyClock - 1) + " taking " + ula.timeToFinish + " clocks");
+        
+        return true;
     }
     
-    @SuppressWarnings("unchecked")
-    // <editor-fold defaultstate="collapsed" desc="Generated Code">                          
-    private void initComponents() {
-
-        jScrollPane1 = new javax.swing.JScrollPane();
-        ReservationTable = new javax.swing.JTable();
-        jScrollPane2 = new javax.swing.JScrollPane();
-        ReorderBufferTable = new javax.swing.JTable();
-        label1 = new java.awt.Label();
-        label2 = new java.awt.Label();
-        nextButton = new javax.swing.JButton();
-        startButton = new javax.swing.JButton();
-        jLabel1 = new javax.swing.JLabel();
-        jScrollPane4 = new javax.swing.JScrollPane();
-        registerTable = new javax.swing.JTable();
-        jLabel2 = new javax.swing.JLabel();
-        jLabel3 = new javax.swing.JLabel();
-        jLabel4 = new javax.swing.JLabel();
-        jLabel5 = new javax.swing.JLabel();
-        instructionsLabel = new javax.swing.JLabel();
-        cpiLabel = new javax.swing.JLabel();
-        pcLabel = new javax.swing.JLabel();
-        clockLabel = new javax.swing.JLabel();
-        clearButton = new javax.swing.JToggleButton();
-        autoButton = new javax.swing.JButton();
-
-        setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setResizable(false);
-
-        ReservationTable.setModel(new javax.swing.table.DefaultTableModel(
-            new Object [][] {
-                {"ER1", "Load/Store", null, null, null, null, null, null, null, null},
-                {"ER2", "Load/Store", null, null, null, null, null, null, null, null},
-                {"ER3", "Load/Store", null, null, null, null, null, null, null, null},
-                {"ER4", "Load/Store", null, null, null, null, null, null, null, null},
-                {"ER5", "Load/Store", null, null, null, null, null, null, null, null},
-                {"ER6", "Add", null, null, null, null, null, null, null, null},
-                {"ER7", "Add", null, null, null, null, null, null, null, null},
-                {"ER8", "Add", null, null, null, null, null, null, null, null},
-                {"ER9", "Mult", null, null, null, null, null, null, null, null},
-                {"ER10", "Mult", null, null, null, null, null, null, null, null}
-            },
-            new String [] {
-                "ID", "Tipo", "Busy", "Instrução", "Dest.", "Vj", "Vk", "Qj", "Qk", "A"
-            }
-        ) {
-            Class[] types = new Class [] {
-                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
-            };
-            boolean[] canEdit = new boolean [] {
-                false, false, false, false, false, false, false, false, false, false
-            };
-
-            public Class getColumnClass(int columnIndex) {
-                return types [columnIndex];
-            }
-
-            public boolean isCellEditable(int rowIndex, int columnIndex) {
-                return canEdit [columnIndex];
-            }
-        });
-        jScrollPane1.setViewportView(ReservationTable);
-
-        ReorderBufferTable.setModel(new javax.swing.table.DefaultTableModel(
-            new Object [][] {
-
-            },
-            new String [] {
-                "Entrada", "Ocupado", "Instrução", "Estado", "Destino", "Valor"
-            }
-        ) {
-            Class[] types = new Class [] {
-                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
-            };
-            boolean[] canEdit = new boolean [] {
-                false, false, false, false, false, false
-            };
-
-            public Class getColumnClass(int columnIndex) {
-                return types [columnIndex];
-            }
-
-            public boolean isCellEditable(int rowIndex, int columnIndex) {
-                return canEdit [columnIndex];
-            }
-        });
-        jScrollPane2.setViewportView(ReorderBufferTable);
-
-        label1.setText("Estações de reserva");
-
-        label2.setText("Buffer de reordenação");
-
-        nextButton.setText("Próximo");
-        nextButton.setEnabled(false);
-        nextButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                nextButtonActionPerformed(evt);
-            }
-        });
-
-        startButton.setText("Iniciar");
-        startButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                startButtonActionPerformed(evt);
-            }
-        });
-
-        jLabel1.setText("Registradores");
-
-        registerTable.setModel(new javax.swing.table.DefaultTableModel(
-            new Object [][] {
-                {"R0", null, null, "R8", null, null, "R16", null, null, "R24", null, null},
-                {"R1", null, null, "R9", null, null, "R17", null, null, "R25", null, null},
-                {"R2", null, null, "R10", null, null, "R18", "", null, "R26", null, null},
-                {"R3", null, null, "R11", null, null, "R19", null, null, "R27", null, null},
-                {"R4", null, null, "R12", null, null, "R20", null, null, "R28", null, null},
-                {"R5", null, null, "R13", null, null, "R21", null, null, "R29", null, null},
-                {"R6", null, null, "R14", null, null, "R22", null, null, "R30", null, null},
-                {"R7", null, null, "R15", null, null, "R23", null, null, "R31", null, null}
-            },
-            new String [] {
-                "", "Qi", "Vi", "", "Qi", "Vi", "", "Qi", "Vi", "", "Qi", "Vi"
-            }
-        ) {
-            Class[] types = new Class [] {
-                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
-            };
-            boolean[] canEdit = new boolean [] {
-                false, false, false, false, false, false, false, false, false, false, false, false
-            };
-
-            public Class getColumnClass(int columnIndex) {
-                return types [columnIndex];
-            }
-
-            public boolean isCellEditable(int rowIndex, int columnIndex) {
-                return canEdit [columnIndex];
-            }
-        });
-        jScrollPane4.setViewportView(registerTable);
-
-        jLabel2.setText("Clock corrente:");
-
-        jLabel3.setText("PC:");
-
-        jLabel4.setText("Instruções concluídas:");
-
-        jLabel5.setText("CPI:");
-
-        instructionsLabel.setText("?");
-
-        cpiLabel.setText("?");
-
-        pcLabel.setText("?");
-
-        clockLabel.setText("?");
-
-        clearButton.setText("Clear");
-        clearButton.setEnabled(false);
-        clearButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                clearButtonActionPerformed(evt);
-            }
-        });
-
-        autoButton.setText("Exec. auto");
-        autoButton.setEnabled(false);
-        autoButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                autoButtonActionPerformed(evt);
-            }
-        });
-
-        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
-        getContentPane().setLayout(layout);
-        layout.setHorizontalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addContainerGap(37, Short.MAX_VALUE)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jLabel1)
-                    .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 653, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(label1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addGroup(layout.createSequentialGroup()
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                                    .addGroup(layout.createSequentialGroup()
-                                        .addComponent(startButton)
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                        .addComponent(nextButton)
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                        .addComponent(clearButton)
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                        .addComponent(autoButton))
-                                    .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(jLabel2)
-                                    .addComponent(jLabel3)
-                                    .addComponent(jLabel5)
-                                    .addComponent(jLabel4, javax.swing.GroupLayout.Alignment.TRAILING))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                                    .addComponent(instructionsLabel)
-                                    .addComponent(pcLabel)
-                                    .addComponent(clockLabel)
-                                    .addComponent(cpiLabel))))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(label2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 413, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                .addContainerGap())
-        );
-        layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addContainerGap(26, Short.MAX_VALUE)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(startButton)
-                            .addComponent(nextButton)
-                            .addComponent(clearButton)
-                            .addComponent(autoButton))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(jLabel1))
-                    .addComponent(label2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, 159, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addGroup(layout.createSequentialGroup()
-                                .addComponent(jLabel2)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jLabel3)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jLabel4)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jLabel5))
-                            .addGroup(layout.createSequentialGroup()
-                                .addComponent(clockLabel)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(pcLabel)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(instructionsLabel)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(cpiLabel)))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(label1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 213, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 411, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(10, 10, 10))
-        );
-
-        pack();
-    }// </editor-fold>                        
-
-    private void startButtonActionPerformed(java.awt.event.ActionEvent evt) {                                            
-        processor = new Processor();
-        if (processor==null)return;
-        startButton.setEnabled(false);
-        nextButton.setEnabled(true);
-        clearButton.setEnabled(true);
-        autoButton.setEnabled(true);
-        clockLabel.setText("0");
-        pcLabel.setText("0");
-        instructionsLabel.setText("0");
-        cpiLabel.setText("0");
-    }                                           
-
-    private void nextButtonActionPerformed(java.awt.event.ActionEvent evt) {                                           
-        processor.nextClock(true);
-        updateTable();
-    }                                          
-
-    private void clearButtonActionPerformed(java.awt.event.ActionEvent evt) {                                            
-        clearTables();
-        startButton.setEnabled(true);
-        nextButton.setEnabled(false);
-        clearButton.setEnabled(false);
-        autoButton.setEnabled(false);
-    }                                           
-
-    private void autoButtonActionPerformed(java.awt.event.ActionEvent evt) {                                           
-        nextButton.setEnabled(false);
-        clearButton.setEnabled(false);
-        autoButton.setEnabled(false);
-        
-        int clk = 0;
-        while(processor.nextClock(false) && clk < MAX_CLOCK){
-            clk++;
+    public boolean executeUlaMem(ULA ula){
+        if (ula.toWrite || ula.isBusy(clock)) {
+            return true;
         }
         
-        updateTable();
-        clearButton.setEnabled(true);
-    }                                          
-
-    
-    public static void main(String args[]) {
+        //procurar alguém pra executar
+        ArrayList<ReservationStation> rList = reservationStationsMemoria;
+        ReservationStation chosen = null;
+        for (int i = 0; i < rList.size(); i++) {
+            ReservationStation re = rList.get(i);
+            if (re.qj == null &&
+                    re.op != Operation.EMPTY && clock > re.issuedClock &&
+                    (chosen == null || chosen.issuedClock > re.issuedClock) &&
+                    ((re.op == Operation.SW && re.reorder == filaRob.peek())
+                    || (re.etapaLoad == 1 && !hasLoadBefore(re.reorder))
+                    || (re.etapaLoad == 2 && !hasRobWithAddress(re.reorder)))) {
+                chosen = re;
+            }
+        }
+        if (chosen == null){
+            return false;     //nenhuma ResStat pra operar
+        }
         
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
+        if (chosen.op == Operation.LW && chosen.etapaLoad == 1) {
+            chosen.A = chosen.vj + chosen.A;
+            chosen.reorder.state = State.EXECUTE;
+            chosen.etapaLoad++;
+            ula.nonBusyClock = clock + 1;
+        }
+        else if (chosen.op == Operation.LW && chosen.etapaLoad == 2) {
+            //Le Mem[chosen.A]
+            chosen.reorder.state = State.EXECUTE;
+            ula.toWrite = true;
+            ula.result = Mem[chosen.A];
+            ula.op = Operation.LW;
+            ula.station = chosen;
+            ula.nonBusyClock = clock + ula.timeToFinish - 1;
+        }
+        else if (chosen.op == Operation.SW) {
+            chosen.reorder.address = chosen.vj + chosen.A;
+            //Escreve Mem[chosen.A]
+            chosen.reorder.state = State.EXECUTE;
+            chosen.reorder.readyClock = clock + ula.timeToFinish;
+            chosen.reorder.value = chosen.vk;
+            chosen.nonBusyClock = -1;
+            chosen.op = Operation.EMPTY;
+            ula.nonBusyClock = clock + ula.timeToFinish;
+        }
+        log(chosen.reorder.co, "started " + chosen.op.toString() + " operation, to be finished in clock " + (ula.nonBusyClock - 1));
+        
+        return true;
+    }
+    
+    public boolean execute() {
+        boolean ret = false;
+        ret = executeUlaAddMul(ulaAdd) || ret;
+        ret = executeUlaAddMul(ulaMult) || ret;
+        ret = executeUlaMem(ulaMem) || ret;
+        return ret;
+    }
+
+    //processador principal  
+    public boolean write() {
+        //procurar algm pronto
+        ArrayList<ULA> ulas = new ArrayList<>();
+        ULA ula = null;
+        ulas.add(ulaMult);
+        ulas.add(ulaMem);
+        ulas.add(ulaAdd);
+        for (ULA utemp : ulas) {
+            if (utemp.toWrite && !utemp.isBusy(clock) && (ula == null || utemp.nonBusyClock < ula.nonBusyClock)) {
+                //caso especial do store
+                if(utemp.op == Operation.SW){
+                    if(utemp.station.qk == null) {
+                        ula = utemp;
+                    }
+                }
+                else {
+                    ula = utemp;
                 }
             }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(MainScreen.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(MainScreen.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(MainScreen.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(MainScreen.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        }
+        if (ula == null) {
+            return false;
         }
         
-
-        
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new MainScreen().setVisible(true);
+        ReservationStation station = ula.station;
+        ReorderBuffer b = station.reorder;
+        if (ula.op != Operation.SW) {
+            ArrayList<ReservationStation> allStations = new ArrayList<>();
+            allStations.addAll(reservationStationsSoma);
+            allStations.addAll(reservationStationsMemoria);
+            allStations.addAll(reservationStationsMultiplicacao);
+            for (ReservationStation rs : allStations) {
+                if (rs.qj == b) {
+                    rs.vj = ula.result;
+                    rs.qj = null;
+                    log(ula.station.reorder.co, "Result " + ula.result + " written in  vj ResStat " + rs.reorder.co.instruction);
+                }
+                if (rs.qk == b) {
+                    rs.vk = ula.result;
+                    rs.qk = null;
+                    log(ula.station.reorder.co, "Result " + ula.result + " written in  vk ResStat " + rs.reorder.co.instruction);
+                }
             }
-        });
+            b.value = ula.result;
+            b.address = ula.A;
+        }
+        else {
+            b.value = station.vk;
+            b.address = ula.A;
+        }
+        
+        b.readyClock = clock + 1;
+        b.state = State.WRITE;
+        log(ula.station.reorder.co, "written in Rob " + b.id + ", Rob ready");
+
+        ula.station.clear();
+        ula.station.nonBusyClock = clock + 1;
+        ula.clear();
+        ula.nonBusyClock = clock + 1;
+        
+        return true;
     }
 
-    // Variables declaration - do not modify                     
-    private javax.swing.JTable ReorderBufferTable;
-    private javax.swing.JTable ReservationTable;
-    private javax.swing.JButton autoButton;
-    private javax.swing.JToggleButton clearButton;
-    private javax.swing.JLabel clockLabel;
-    private javax.swing.JLabel cpiLabel;
-    private javax.swing.JLabel instructionsLabel;
-    private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel2;
-    private javax.swing.JLabel jLabel3;
-    private javax.swing.JLabel jLabel4;
-    private javax.swing.JLabel jLabel5;
-    private javax.swing.JScrollPane jScrollPane1;
-    private javax.swing.JScrollPane jScrollPane2;
-    private javax.swing.JScrollPane jScrollPane4;
-    private java.awt.Label label1;
-    private java.awt.Label label2;
-    private javax.swing.JButton nextButton;
-    private javax.swing.JLabel pcLabel;
-    private javax.swing.JTable registerTable;
-    private javax.swing.JButton startButton;
-    // End of variables declaration                   
+    public void clearMistake() {
+        filaRob.clear();
+        ulaAdd.clear();
+        ulaMem.clear();
+        ulaMult.clear();
+        for (int i = 0; i < N_Register; i++) {
+            Reg[i].clear();
+        }
+        for (int i = 0; i < N_ReorderBuffer; i++) {
+            rob.get(i).clear();
+        }
+        for (int i = 0; i < N_Reservation_Mem; i++) {
+            reservationStationsMemoria.get(i).clear();
+        }
+        for (int i = 0; i < N_Reservation_Mult; i++) {
+            reservationStationsMultiplicacao.get(i).clear();
+        }
+        for (int i = 0; i < N_Reservation_Soma; i++) {
+            reservationStationsSoma.get(i).clear();
+        }
+    }
+
+    public boolean commit() {
+        if (filaRob.isEmpty()){
+            return false; //No Rob used
+        }
+        ReorderBuffer h = filaRob.peek();
+        if (!h.isReady(clock)){
+            return true; //Not ready
+        }
+        filaRob.poll();
+        instructionCounter++;
+        Register d = h.destination;
+        
+        //Libera o Rob
+        h.state = State.COMMIT;
+        h.nonBusyClock = clock + 1;
+        log(h.co, "commited, " + (N_ReorderBuffer - filaRob.size()) + " free Robs");
+        if (N_ReorderBuffer == filaRob.size()){
+            System.out.println("Error:");
+            for(int i=0; i<N_ReorderBuffer; i++){
+                System.out.println(i + "=i: " + filaRob.peek().co.instruction);
+                filaRob.add(filaRob.poll());
+            }
+        }
+        
+        //Altera o PC se for branch
+        //BEQ, BLQ, BNE
+        if (h.co.op == Operation.BEQ || h.co.op == Operation.BLE || h.co.op == Operation.BNE){
+            prediction = h.preditor.predict();
+            h.preditor.update(h.value);    
+            if(h.newPreditor)
+                preditores.add(h.preditor);
+         //   System.out.println(preditores.size());
+            if (prediction !=  h.value){    //mispredicted
+                if (h.value == 1){
+                    pc = h.address;
+                }
+                else{
+                    pc = h.co.pc + 4;
+                }
+                /*
+                consecutiveErrors++;
+                log(h.co, "prediction failed, Robs cleared, pc now at " + pc);
+                if (consecutiveErrors > N_ErrorLimit){
+                    consecutiveErrors = 0;
+                    prediction = 1 - prediction;
+                    log(h.co, "prediction satte switched to " + prediction);
+                }*/
+                clearMistake();
+            }
+            else {
+                consecutiveErrors = 0;
+                log(h.co, "prediction succedded");
+            }
+        }
+        
+        //Seta a memoria se for store
+        //SW
+        else if (h.co.op == Operation.SW) {
+            log(h.co, "written " + h.value + " in Mem[" + h.address + "]");
+            Mem[h.address] = h.value;
+        }
+        
+        //Qualquer outro comando, escreve no registrador
+        else {
+            if (h.destination != null){
+                h.destination.value = h.value;
+                if (h.destination.qi == h){
+                    h.destination.busy = false;
+                }
+                log(h.co, "written " + h.value + " in Reg[" + h.destination.id + "]");
+            }
+        }
+        
+        return true;
+    }
+    
+    private boolean hasRobWithAddress(ReorderBuffer cur) {
+        Queue<ReorderBuffer> fila = new LinkedList<>(filaRob);
+        while(fila.peek() != cur){
+            if (fila.peek().address == cur.address) return true;
+            fila.poll();
+        }
+        return false;
+    }
+    
+    private boolean hasLoadBefore(ReorderBuffer cur) {
+        Queue<ReorderBuffer> fila = new LinkedList<>(filaRob);
+        while(fila.peek() != cur){
+            if (fila.peek().co.op == Operation.LW) return true;
+            fila.poll();
+        }
+        return false;
+    }
+
+    public ArrayList<ReorderBuffer> getRob() {
+        return rob;
+    }
+
+    public ArrayList<ReservationStation> getReservationStationsSoma() {
+        return reservationStationsSoma;
+    }
+
+    public ArrayList<ReservationStation> getReservationStationsMultiplicacao() {
+        return reservationStationsMultiplicacao;
+    }
+
+    public ArrayList<ReservationStation> getReservationStationsMemoria() {
+        return reservationStationsMemoria;
+    }
+
+    public int getPc() {
+        return pc;
+    }
+
+    public int getClock() {
+        return clock;
+    }
+
+    public int getInstructionCounter() {
+        return instructionCounter;
+    }
+
+    public List<Register> getR() {
+        return Arrays.asList(Reg);
+    }
+
+    public ReorderBuffer getFirstNonBusyRob() {
+        if (filaRob.size() >= N_ReorderBuffer){
+            return null;
+        }
+        ReorderBuffer r = rob.get(robId);
+        robId++;
+        if (robId >= N_ReorderBuffer) {
+            robId = 0;
+        }
+        return r;
+    }
 }

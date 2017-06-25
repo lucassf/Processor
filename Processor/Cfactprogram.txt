@@ -8,6 +8,6 @@ label1:
 	goto(label3);
 label2:	
 	i = i+1;
-	goto(label2);
+	goto(label1);
 label3:
 	n = n - i;

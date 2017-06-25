@@ -145,7 +145,6 @@ public class MainScreen extends javax.swing.JFrame {
         clockLabel = new javax.swing.JLabel();
         clearButton = new javax.swing.JToggleButton();
         autoButton = new javax.swing.JButton();
-        pauseButton = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setResizable(false);
@@ -294,14 +293,6 @@ public class MainScreen extends javax.swing.JFrame {
             }
         });
 
-        pauseButton.setText("Parar");
-        pauseButton.setEnabled(false);
-        pauseButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                pauseButtonActionPerformed(evt);
-            }
-        });
-
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -323,9 +314,7 @@ public class MainScreen extends javax.swing.JFrame {
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                         .addComponent(clearButton)
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                        .addComponent(autoButton)
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                        .addComponent(pauseButton))
+                                        .addComponent(autoButton))
                                     .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -355,8 +344,7 @@ public class MainScreen extends javax.swing.JFrame {
                             .addComponent(startButton)
                             .addComponent(nextButton)
                             .addComponent(clearButton)
-                            .addComponent(autoButton)
-                            .addComponent(pauseButton))
+                            .addComponent(autoButton))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addComponent(jLabel1))
                     .addComponent(label2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -422,7 +410,6 @@ public class MainScreen extends javax.swing.JFrame {
         nextButton.setEnabled(false);
         clearButton.setEnabled(false);
         autoButton.setEnabled(false);
-        pauseButton.setEnabled(true);
         
         int clk = 0;
         while(processor.nextClock(false) && clk < MAX_CLOCK){
@@ -430,12 +417,8 @@ public class MainScreen extends javax.swing.JFrame {
         }
         
         updateTable();
-        startButton.setEnabled(true);
+        clearButton.setEnabled(true);
     }//GEN-LAST:event_autoButtonActionPerformed
-
-    private void pauseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_pauseButtonActionPerformed
-        pauseButton.setEnabled(false);
-    }//GEN-LAST:event_pauseButtonActionPerformed
 
     
     public static void main(String args[]) {
@@ -485,7 +468,6 @@ public class MainScreen extends javax.swing.JFrame {
     private java.awt.Label label1;
     private java.awt.Label label2;
     private javax.swing.JButton nextButton;
-    private javax.swing.JButton pauseButton;
     private javax.swing.JLabel pcLabel;
     private javax.swing.JTable registerTable;
     private javax.swing.JButton startButton;
