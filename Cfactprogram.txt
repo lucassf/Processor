@@ -1,0 +1,13 @@
+int n = 1;
+int j = n;
+int i = 1;
+int k = 6;
+label1:
+	n = n*i;
+	if (i!=k)goto(label2);
+	goto(label3);
+label2:	
+	i = i+1;
+	goto(label1);
+label3:
+	n = n - i;
